@@ -2,6 +2,9 @@
 .claude/
 .mcp.json
 
+# Internal docs and planning files
+docs/
+
 # Logs
 logs
 *.log
