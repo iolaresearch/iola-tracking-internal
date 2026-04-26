@@ -78,7 +78,8 @@ action_items fields:
   due_date (YYYY-MM-DD or null),
   status (To Do|In Progress|Done),
   priority (Critical|High|Medium|Low),
-  week_label (text — any free string, used for grouping)
+  week_label (text — any free string, used for grouping),
+  sort_order (integer — lower number = higher in list, use to reorder tasks)
 
 team_notes fields:
   title (text — short, searchable), body (text — full content),
