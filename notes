@@ -1,0 +1,121 @@
+IOLA Tracking Internal — Full PRD and Context
+What this is
+A lightweight internal operations platform for Ikirere Orbital Labs Africa (IOLA), a deep tech space startup building satellite coordination software and multipurpose CubeSats for Africa. The platform replaces manual spreadsheets and WhatsApp coordination with a clean, shared workspace where the team tracks fundraising applications, outreach contacts, research progress, and action items — all in one place.
+Tech stack
+
+Frontend: React, hosted on Vercel
+Database: Supabase (free tier, Postgres under the hood)
+Auth: Supabase Auth (email + password, with admin invite flow)
+AI assistant: Anthropic Claude API (claude-sonnet-4-20250514) for natural language edits and queries
+Styling: Tailwind CSS
+
+
+Team accounts (5 users)
+Jason Quist — Admin, Co-Founder and CEO
+Gideon Salami — Co-Founder and CTO
+Abigail Boateng — Head of Research
+Ignatius Balayo — Machine Learning Engineer
+Alph Doamekpor — Co-Founder, Strategy and Product Systems
+Jason is the admin. He can invite users, reset passwords, and see all data. Other users see the shared dashboard and their own assigned items.
+
+Core modules
+1. Applications and Grants tracker
+Fields per entry: Name, Type (Accelerator / Grant / VC / Partnership / Academic), Region, Amount, Status (Not Yet Applied / Applied / In Progress / Accepted / Rejected / Pending), Priority (Critical / High / Medium / Low), Deadline, Owner, Notes, Contact name.
+Pre-loaded data includes:
+Black Flag — Accelerator — USA — $2M to $3M — Not Yet Applied — Critical — Rolling 30-day review. Backed by Palantir, Anthropic, xAI founders. Defense, space, hardware focus. Apply immediately after Delaware registration.
+LVL UP Labs — Accelerator — USA — $250K plus perks — Not Yet Applied — Critical — Previously accepted. Blocked only by missing Delaware C-Corp. Roberto (Italy) referral available. Apply as soon as registration confirmed.
+Techstars Europe — Accelerator — Europe — Varies — Not Yet Applied — High — Deadline June 10 2026.
+ESA Kick-starts — Grant — Europe — EUR 75000 — In Progress — Critical — Deadline May 29 2026. Submit via Alph Doamekpor (Germany entity). Non-dilutive.
+SPACERAISE 2026 — Grant — Europe — Scholarship — Accepted — High — Late May 2026. Jason attending L'Aquila Italy. Natural moment for Moira (SRI International) introduction.
+Deep Learning Indaba Grants — Grant — Africa — Varies — Pending — High — Warm relationship. Won 2025 Ideathon.
+Google for Startups — Grant — Global — Cloud credits — Accepted — Medium — Active.
+Nvidia Inception — Grant — Global — GPU credits — Accepted — Medium — Active for IkirereMesh RL training.
+Station F Fighters — Accelerator — Europe — Workspace plus network — Applied — High — Rolling.
+Generation Space — VC / Angel — Global — Up to 10B fund — Not Yet Applied — Medium.
+Speedrun — Accelerator — Global — Varies — Not Yet Applied — Medium — High buzz around current cohort.
+Setcoin Group / DSE Fund — VC / Angel — Europe — EUR 17B fund — In Progress — Low — Long-term relationship only. Minimum ticket EUR 100M. Revisit in 18 to 24 months.
+2. Outreach and Contacts tracker
+Fields per entry: Name, Role, Region, Status (Active / Pending / Warm / Cold / Done), Last Contact date, Notes, Next Step, Owner.
+Pre-loaded data:
+Michael Daley — Financial advisor and connector — USA Bay Area — Active — April 24 2026 — Created Africa Space Race WhatsApp group. Moira from SRI International and Vijay in the group. Zoom call with Moira being arranged. — Wait for Moira intro in WhatsApp group — Jason.
+Rosalind — Harvard Center for African Studies, Associate Director — USA Boston — Active — April 23 2026 — Very warm. Bio sent. Will intro Prof. Achampon week of May 12. Connected to Prof. Dembele (School of Engineering) and climate sustainability faculty. — Email Prof. Achampon May 12 — Jason.
+Parsa — CEO, Spark (geospatial and defense tech, 500 people) — Canada Vancouver — Pending — April 22 2026 — Good call. Offered dev support, ISRO contact (chief architect of India moon missions), and investor intros in NY and LA. Waiting for deck. — Send IOLA pre-seed deck — Jason.
+Sameep — Tech dev company with NATO AI work — UK London — Pending — April 22 2026 — Shared IOLA site with 2 defense contacts. Has ISRO partner. Mentioned Chilean VC for lunar rover company. — Follow up Monday April 28 — Jason.
+Olena / Setcoin Group — BD and deal sourcing — Europe — Warm — April 21 2026 — Sent phase roadmap. Said interesting, will look when raising. Long-term play only. — Keep warm, update when Phase 1 ships — Jason.
+3. Action Items (May 2026)
+Each item has: title, description, owner, due date, status (To Do / In Progress / Done), priority.
+Pre-loaded with the full May plan:
+Week 1 (Apr 28 to May 4):
+
+Register Delaware C-Corp via Stripe Atlas — Jason — May 2 — Critical — Blocking everything else
+Apply to Black Flag — Jason — May 2 — Critical
+Follow up with Sameep — Jason — April 28 — High
+Send deck to Parsa — Jason — April 28 — High
+Begin Phase 1 TLE data ingestion from CelesTrak — Salami — Start immediately — Critical
+Begin research literature review for Q4 paper — Abigail — Start immediately — High
+Everyone shares 2 to 3 network contacts with Jason — All — May 5 — High
+
+Week 2 (May 5 to 11):
+
+Apply to Techstars Europe — Jason — May 9 — High
+Apply to LVL UP Labs (after Delaware done) — Jason — Immediately after C-Corp — Critical
+SGP4 orbit propagation implementation — Salami — May 9 — Critical
+Share network contacts with Jason — All — May 5 — High
+
+Week 3 (May 12 to 18):
+
+Email Professor Achampon (Harvard intro via Rosalind) — Jason — May 12 — Critical
+ESA Kick-starts application final push — Jason and Alph — May 29 deadline — Critical
+Connect simulation frontend to real orbital engine — Salami — May 16 — Critical
+
+Week 4 (May 19 to 31):
+
+SPACERAISE 2026 Italy — Jason — Late May — Critical
+ESA Kick-starts submission — Jason and Alph — May 29 — Critical
+Phase 1 complete, integration testing — Salami — May 30 — Critical
+Research paper first draft (intro and background sections) — Abigail — May 30 — High
+
+4. Team dashboard (bird's-eye view)
+Main page shows:
+
+Total applications, accepted count, in-progress count, critical and not-yet-applied count
+Upcoming deadlines in the next 14 days (highlighted in red if within 7 days)
+Each team member as a card. Click to expand and see their assigned action items and outreach contacts.
+Recent activity feed (last 10 changes across the platform)
+
+5. AI assistant
+A chat input in the corner. Connected to the Anthropic Claude API (claude-sonnet-4-20250514). The user types natural language like "mark ESA Kick-starts as submitted" or "what is Abigail working on this week" or "add a new contact: Roberto, Italy, space ecosystem, warm" and the assistant reads the current Supabase state and makes the appropriate update or returns the answer.
+
+Design principles
+Simple, dark, and spacious. IOLA brand colors: teal (#00897B) as accent, deep navy (#0D1B2A) as background, amber (#F59E0B) for urgent items. No clutter. Everything readable at a glance. Mobile-friendly. If you click on a team member you expand into their view. No cramped CRM feeling. Every screen has one job.
+
+Supabase tables needed
+users (managed by Supabase Auth), applications (all fields above), outreach (all fields above), action_items (all fields above), activity_log (user_id, action, timestamp, entity_type, entity_id).
+
+Auth flow
+Jason creates accounts via Supabase admin and sends invite emails. Team members set their own passwords. No public signup. Everyone sees the shared dashboard. Only Jason can delete records or change other users' passwords.
+
+Hosting
+Vercel. Connect the GitHub repo iola-tracking-internal. Auto-deploy on push to main.
+
+1. All data is Supabase records, not hardcoded. The pre-populated entries I listed are seed data — they go into a database migration or seed file so Supabase inserts them on first setup. Every single field is editable through the UI. This is a full CRUD application. Create, read, update, delete on every table, every row, every field. Nothing is hardcoded in the frontend.
+2. AI assistant uses Gemini, not Claude. Use Google Gemini API (gemini-2.0-flash is fast and cheap). Same concept: natural language input, reads Supabase state, makes updates or answers questions. Gemini's API is straightforward and the free tier is generous enough for internal team use.
+Updated applications table fields (replacing what I had before):
+
+id
+name (venture or program name)
+type (Accelerator / Grant / VC / Angel / Partnership / Academic)
+location / region
+fund description (what they fund, their thesis, what they look for)
+application status (Not Yet Applied / Applied / In Progress / Accepted / Rejected / Pending)
+priority level (Critical / High / Medium / Low)
+next step (the specific action needed right now)
+extra notes (anything else relevant)
+amount (funding amount or range)
+deadline
+contact name
+owner (team member)
+created_at
+updated_at
+
+Everything in that table is editable inline from the dashboard or via a form modal. Status and priority are dropdowns. All other fields are text inputs. Changes write directly to Supabase and update the UI instantly. The activity log records every change with who made it and when.
