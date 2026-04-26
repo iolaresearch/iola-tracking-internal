@@ -8,6 +8,7 @@ const NAV = [
   { to: "/applications", label: "Applications & Grants", icon: "◎" },
   { to: "/outreach", label: "Outreach & Contacts", icon: "◈" },
   { to: "/action-items", label: "Action Items", icon: "◆" },
+  { to: "/knowledge", label: "Knowledge Base", icon: "◉" },
 ];
 
 export default function Layout() {

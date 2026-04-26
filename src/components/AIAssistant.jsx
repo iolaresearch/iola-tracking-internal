@@ -6,12 +6,23 @@ import { useActivity } from "../hooks/useActivity";
 
 // ─── System prompt ───────────────────────────────────────────────────────────
 
-function buildSystemPrompt(apps, outreach, items) {
+function buildSystemPrompt(apps, outreach, items, notes) {
   const groups = [...new Set(items.map((i) => i.week_label).filter(Boolean))];
 
   return `You are the IOLA AI assistant for Ikirere Orbital Labs Africa — a deep tech space startup building satellite coordination software and CubeSats for Africa.
 
 You have FULL access to the team's live operations data. You can read, create, update, and delete any record, exactly like a human using the dashboard.
+
+${notes.length > 0 ? `════════════════════════════════════════
+TEAM KNOWLEDGE BASE — READ THIS FIRST
+════════════════════════════════════════
+This is the shared team memory. Use it to answer questions correctly and avoid errors.
+Never contradict or ignore what is written here.
+
+${notes.map((n) => `[${n.category.toUpperCase()}] ${n.title}
+${n.body}`).join("\n\n---\n\n")}
+
+════════════════════════════════════════` : ""}
 
 ════════════════════════════════════════
 CURRENT DATA
@@ -69,6 +80,10 @@ action_items fields:
   priority (Critical|High|Medium|Low),
   week_label (text — any free string, used for grouping)
 
+team_notes fields:
+  title (text — short, searchable), body (text — full content),
+  category (Contact|Context|Rule|Fundraising|Engineering|Research|General)
+
 ════════════════════════════════════════
 ACTION PROTOCOL
 ════════════════════════════════════════
@@ -79,16 +94,19 @@ CREATE:
 {"action":"create_application","data":{"name":"...","type":"...","status":"...","priority":"..."}}
 {"action":"create_outreach","data":{"name":"...","role":"...","status":"...","owner":"Jason"}}
 {"action":"create_action_item","data":{"title":"...","owner":"...","status":"To Do","priority":"High","week_label":"..."}}
+{"action":"create_team_note","data":{"title":"...","body":"...","category":"Contact"}}
 
 UPDATE (use a data object — include only fields that change):
 {"action":"update_application","id":"<uuid>","data":{"status":"Applied","next_step":"Submit by Friday"}}
 {"action":"update_outreach","id":"<uuid>","data":{"status":"Active","last_contact":"2026-04-26"}}
 {"action":"update_action_item","id":"<uuid>","data":{"status":"Done"}}
+{"action":"update_team_note","id":"<uuid>","data":{"body":"updated content"}}
 
 DELETE:
 {"action":"delete_application","id":"<uuid>","name":"<record name for confirmation>"}
 {"action":"delete_outreach","id":"<uuid>","name":"<contact name>"}
 {"action":"delete_action_item","id":"<uuid>","name":"<task title>"}
+{"action":"delete_team_note","id":"<uuid>","name":"<note title>"}
 
 Rules:
 - Use exact UUIDs from the data above.
@@ -97,12 +115,14 @@ Rules:
 - For deletes, always include name so the log is readable.
 - You can output multiple action lines for bulk operations.
 - Only output actions you are confident about. If ambiguous, ask for clarification.
-- Keep your text response concise. Let the actions do the work.`;
+- Keep your text response concise. Let the actions do the work.
+
+MEMORY RULE: When the user says "remember", "note that", "save this", "don't forget", or shares context the team should retain — create a team_note automatically. Title should be short and searchable. Body should be complete and self-contained. Choose the most appropriate category.`;
 }
 
 // ─── Action executor ─────────────────────────────────────────────────────────
 
-async function executeAction(act, { apps, outreach, items, log, qc }) {
+async function executeAction(act, { apps, outreach, items, notes, log, qc }) {
   const invalidate = (keys) => keys.forEach((k) => qc.invalidateQueries([k]));
 
   switch (act.action) {
@@ -172,6 +192,29 @@ async function executeAction(act, { apps, outreach, items, log, qc }) {
       return `Deleted task: ${act.name}`;
     }
 
+    // ── Team Notes ──
+    case "create_team_note": {
+      const { data: { session } } = await supabase.auth.getSession();
+      const payload = { ...act.data, created_by: session?.user?.email?.split("@")[0] ?? "AI" };
+      const { data } = await supabase.from("team_notes").insert(payload).select().single();
+      await log({ action: "AI: saved to knowledge base", entityType: "team_note", entityId: data.id, entityName: act.data.title });
+      invalidate(["team_notes", "activity_log"]);
+      return `Saved to knowledge base: ${act.data.title}`;
+    }
+    case "update_team_note": {
+      await supabase.from("team_notes").update(act.data).eq("id", act.id);
+      const name = notes.find((n) => n.id === act.id)?.title ?? act.id;
+      await log({ action: "AI: updated knowledge note", entityType: "team_note", entityId: act.id, entityName: name });
+      invalidate(["team_notes", "activity_log"]);
+      return `Updated knowledge note: ${name}`;
+    }
+    case "delete_team_note": {
+      await supabase.from("team_notes").delete().eq("id", act.id);
+      await log({ action: "AI: deleted knowledge note", entityType: "team_note", entityId: act.id, entityName: act.name });
+      invalidate(["team_notes", "activity_log"]);
+      return `Deleted knowledge note: ${act.name}`;
+    }
+
     default:
       return null;
   }
@@ -181,11 +224,11 @@ async function executeAction(act, { apps, outreach, items, log, qc }) {
 
 const SUGGESTIONS = [
   "What are our critical deadlines this month?",
-  "Add a contact: Roberto, Italy, space ecosystem, warm",
+  "Remember that Roberto's email is roberto@example.com — Italy, space ecosystem",
   "Mark ESA Kick-starts as submitted",
-  "Add a task: Apply to Speedrun, owner Jason, Critical, Week 1",
-  "What is Salami working on?",
-  "Delete the Setcoin application — it's not relevant right now",
+  "Add a task: Apply to Speedrun, owner Jason, Critical",
+  "What does the team know about Roberto?",
+  "What is Abigail working on?",
 ];
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -212,6 +255,10 @@ export default function AIAssistant() {
     queryKey: ["action_items"],
     queryFn: () => supabase.from("action_items").select("*").then((r) => r.data ?? []),
   });
+  const { data: notes = [] } = useQuery({
+    queryKey: ["team_notes"],
+    queryFn: () => supabase.from("team_notes").select("*").order("category").order("title").then((r) => r.data ?? []),
+  });
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
   useEffect(() => { if (open) setTimeout(() => inputRef.current?.focus(), 100); }, [open]);
@@ -224,7 +271,7 @@ export default function AIAssistant() {
     setLoading(true);
 
     try {
-      const raw = await askGemini(buildSystemPrompt(apps, outreach, items), msg);
+      const raw = await askGemini(buildSystemPrompt(apps, outreach, items, notes), msg);
 
       // Split response text from action lines
       const lines = raw.split("\n");
@@ -248,7 +295,7 @@ export default function AIAssistant() {
         for (const line of actionLines) {
           try {
             const act = JSON.parse(line.trim());
-            const result = await executeAction(act, { apps, outreach, items, log, qc });
+            const result = await executeAction(act, { apps, outreach, items, notes, log, qc });
             if (result) results.push(result);
           } catch {
             // malformed JSON line — skip

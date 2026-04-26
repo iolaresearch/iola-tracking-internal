@@ -6,6 +6,7 @@ import Dashboard from "./pages/Dashboard";
 import Applications from "./pages/Applications";
 import Outreach from "./pages/Outreach";
 import ActionItems from "./pages/ActionItems";
+import KnowledgeBase from "./pages/KnowledgeBase";
 
 export default function App() {
   return (
@@ -24,6 +25,7 @@ export default function App() {
           <Route path="applications" element={<Applications />} />
           <Route path="outreach" element={<Outreach />} />
           <Route path="action-items" element={<ActionItems />} />
+          <Route path="knowledge" element={<KnowledgeBase />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
