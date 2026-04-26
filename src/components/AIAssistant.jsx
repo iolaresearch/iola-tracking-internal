@@ -74,12 +74,16 @@ outreach fields:
   next_step (text), owner (text)
 
 action_items fields:
-  title (text), description (text), owner (text),
+  title (text), description (text),
+  owner (text — primary owner, keep in sync with first element of owners),
+  owners (text[] — array of assignees, e.g. ["Jason","Abigail"]),
   due_date (YYYY-MM-DD or null),
   status (To Do|In Progress|Done),
   priority (Critical|High|Medium|Low),
   week_label (text — any free string, used for grouping),
   sort_order (integer — lower number = higher in list, use to reorder tasks)
+
+Valid owner names: Jason, Salami, Abigail, Ignatius, Alph
 
 team_notes fields:
   title (text — short, searchable), body (text — full content),

@@ -17,6 +17,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { supabase } from "../lib/supabase";
 import { useActivity } from "../hooks/useActivity";
+import { notifyAssigned } from "../lib/notifications";
 import PriorityBadge from "../components/PriorityBadge";
 import Modal from "../components/Modal";
 
@@ -30,10 +31,10 @@ const WEEKS      = [
   "Week 3 — May 12 to May 18",
   "Week 4 — May 19 to May 31",
 ];
-const OWNERS = ["Jason", "Salami", "Abigail", "Ignatius", "Alph", "Jason + Alph", "All"];
+const OWNERS = ["Jason", "Salami", "Abigail", "Ignatius", "Alph"];
 
 const EMPTY = {
-  title: "", description: "", owner: "Jason", due_date: "",
+  title: "", description: "", owners: ["Jason"], owner: "Jason", due_date: "",
   status: "To Do", priority: "High", week_label: "", sort_order: 0,
 };
 
@@ -73,8 +74,18 @@ function Field({ label, children }) {
 }
 
 function TaskForm({ initial, existingGroups, onSave, onClose }) {
-  const [form, setForm] = useState(initial);
+  const [form, setForm] = useState({ ...initial, owners: initial.owners?.length ? initial.owners : (initial.owner ? [initial.owner] : ["Jason"]) });
+  const [notify, setNotify] = useState(!initial.id); // notify by default on new tasks
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  const toggleOwner = (name) => {
+    setForm((f) => {
+      const has = f.owners.includes(name);
+      const next = has ? f.owners.filter((o) => o !== name) : [...f.owners, name];
+      return { ...f, owners: next, owner: next[0] ?? "" };
+    });
+  };
+
   return (
     <>
       <div className="space-y-4">
@@ -84,12 +95,34 @@ function TaskForm({ initial, existingGroups, onSave, onClose }) {
         <Field label="Description">
           <textarea value={form.description} onChange={(e) => set("description", e.target.value)} rows={3} className={inputCls + " resize-none"} />
         </Field>
+
+        <Field label="Assigned to">
+          <div className="flex flex-wrap gap-2 mt-1">
+            {OWNERS.map((name) => {
+              const selected = form.owners.includes(name);
+              return (
+                <button
+                  key={name}
+                  type="button"
+                  onClick={() => toggleOwner(name)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                    selected
+                      ? "bg-teal/20 border-teal/60 text-teal"
+                      : "bg-navy border-navy-700 text-gray-400 hover:text-white hover:border-gray-500"
+                  }`}
+                >
+                  {selected && <span className="mr-1">✓</span>}
+                  {name}
+                </button>
+              );
+            })}
+          </div>
+          {form.owners.length === 0 && (
+            <p className="text-red-400 text-xs mt-1">Select at least one person.</p>
+          )}
+        </Field>
+
         <div className="grid grid-cols-2 gap-4">
-          <Field label="Owner">
-            <select value={form.owner} onChange={(e) => set("owner", e.target.value)} className={inputCls}>
-              {OWNERS.map((o) => <option key={o}>{o}</option>)}
-            </select>
-          </Field>
           <Field label="Due Date">
             <input type="date" value={form.due_date || ""} onChange={(e) => set("due_date", e.target.value)} className={inputCls} />
           </Field>
@@ -103,25 +136,40 @@ function TaskForm({ initial, existingGroups, onSave, onClose }) {
               {PRIORITIES.map((p) => <option key={p}>{p}</option>)}
             </select>
           </Field>
+          <Field label="Group">
+            <input
+              list="group-options"
+              value={form.week_label}
+              onChange={(e) => set("week_label", e.target.value)}
+              className={inputCls}
+              placeholder="Select or create…"
+            />
+            <datalist id="group-options">
+              {existingGroups.map((g) => <option key={g} value={g} />)}
+            </datalist>
+          </Field>
         </div>
-        <Field label="Group">
-          <input
-            list="group-options"
-            value={form.week_label}
-            onChange={(e) => set("week_label", e.target.value)}
-            className={inputCls}
-            placeholder="Type to select or create a group…"
-          />
-          <datalist id="group-options">
-            {existingGroups.map((g) => <option key={g} value={g} />)}
-          </datalist>
-        </Field>
+
+        {/* Notify toggle */}
+        <label className="flex items-center gap-3 cursor-pointer select-none">
+          <div
+            onClick={() => setNotify((n) => !n)}
+            className={`w-9 h-5 rounded-full transition-colors relative ${notify ? "bg-teal" : "bg-navy-700"}`}
+          >
+            <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${notify ? "translate-x-4" : "translate-x-0.5"}`} />
+          </div>
+          <span className="text-xs text-gray-400">
+            Notify assigned people by email
+            {form.owners.length > 0 && <span className="text-gray-600 ml-1">(sends to those with emails on file)</span>}
+          </span>
+        </label>
       </div>
+
       <div className="flex justify-end gap-3 mt-6">
         <button onClick={onClose} className="px-4 py-2 text-sm text-gray-400 hover:text-white border border-navy-700 rounded-lg transition-colors">Cancel</button>
         <button
-          onClick={() => onSave(form)}
-          disabled={!form.title.trim()}
+          onClick={() => onSave({ ...form, notify })}
+          disabled={!form.title.trim() || form.owners.length === 0}
           className="px-5 py-2 text-sm font-bold bg-teal text-white rounded-lg hover:bg-teal-light transition-colors disabled:opacity-40"
         >
           Save
@@ -196,9 +244,11 @@ function TaskCard({ item, onEdit, onDelete, onCycle, dragHandleProps = {} }) {
             {item.title}
           </span>
           <PriorityBadge priority={item.priority} />
-          <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${OWNER_BADGE[item.owner] ?? "bg-gray-800 text-gray-400"}`}>
-            {item.owner}
-          </span>
+          {(item.owners?.length ? item.owners : [item.owner]).filter(Boolean).map((o) => (
+            <span key={o} className={`px-2 py-0.5 rounded-full text-xs font-semibold ${OWNER_BADGE[o] ?? "bg-gray-800 text-gray-400"}`}>
+              {o}
+            </span>
+          ))}
         </div>
         {item.description && <p className="text-gray-400 text-xs mt-1 leading-relaxed">{item.description}</p>}
         {item.due_date && (
@@ -401,14 +451,51 @@ export default function ActionItems() {
 
   const upsert = useMutation({
     mutationFn: async (row) => {
-      if (row.id) {
-        await supabase.from("action_items").update(row).eq("id", row.id);
-        await log({ action: "updated task", entityType: "action_item", entityId: row.id, entityName: row.title });
+      const { notify, ...payload } = row;
+      // Keep owner in sync with first owner for backwards compat
+      payload.owner = payload.owners?.[0] ?? payload.owner ?? "";
+
+      const { data: { session } } = await supabase.auth.getSession();
+      const assignedBy = session?.user?.email?.split("@")[0] ?? "Someone";
+
+      if (payload.id) {
+        const prev = items.find((i) => i.id === payload.id);
+        await supabase.from("action_items").update(payload).eq("id", payload.id);
+        await log({ action: "updated task", entityType: "action_item", entityId: payload.id, entityName: payload.title });
+
+        // Notify only newly added owners
+        if (notify && payload.owners?.length) {
+          const prevOwners = prev?.owners ?? [];
+          const newOwners = payload.owners.filter((o) => !prevOwners.includes(o));
+          if (newOwners.length > 0) {
+            await notifyAssigned({
+              taskTitle: payload.title,
+              taskDescription: payload.description,
+              dueDate: payload.due_date,
+              priority: payload.priority,
+              group: payload.week_label,
+              assignedBy,
+              ownerNames: newOwners,
+            });
+          }
+        }
       } else {
-        const groupItems = items.filter((i) => i.week_label === row.week_label);
+        const groupItems = items.filter((i) => i.week_label === payload.week_label);
         const maxOrder = groupItems.reduce((m, i) => Math.max(m, i.sort_order ?? 0), -1);
-        const { data } = await supabase.from("action_items").insert({ ...row, sort_order: maxOrder + 1 }).select().single();
-        await log({ action: "added task", entityType: "action_item", entityId: data.id, entityName: row.title });
+        const { data } = await supabase.from("action_items").insert({ ...payload, sort_order: maxOrder + 1 }).select().single();
+        await log({ action: "added task", entityType: "action_item", entityId: data.id, entityName: payload.title });
+
+        if (notify && payload.owners?.length) {
+          await notifyAssigned({
+            taskTitle: payload.title,
+            taskDescription: payload.description,
+            dueDate: payload.due_date,
+            priority: payload.priority,
+            group: payload.week_label,
+            assignedBy,
+            ownerNames: payload.owners,
+          });
+        }
       }
     },
     onSuccess: () => { qc.invalidateQueries(["action_items"]); qc.invalidateQueries(["activity_log"]); setModal(null); },
