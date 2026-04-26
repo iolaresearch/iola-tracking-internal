@@ -1,24 +1,26 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 
 export default function Login() {
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError("");
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: window.location.origin },
+    });
     if (error) {
       setError(error.message);
       setLoading(false);
     } else {
-      navigate("/");
+      setSent(true);
+      setLoading(false);
     }
   };
 
@@ -37,50 +39,55 @@ export default function Login() {
           <p className="text-gray-500 text-sm mt-1">Internal Operations Platform</p>
         </div>
 
-        <form
-          onSubmit={handleLogin}
-          className="bg-navy-800 rounded-2xl p-8 border border-navy-700 space-y-5"
-        >
-          {error && (
-            <div className="text-red-400 text-sm bg-red-900/20 border border-red-900/40 rounded-lg px-4 py-3">
-              {error}
-            </div>
-          )}
-          <div>
-            <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-              Email
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              autoComplete="email"
-              className="w-full bg-navy border border-navy-700 text-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-teal transition-colors placeholder-gray-600"
-              placeholder="you@ikirere.com"
-            />
+        {sent ? (
+          <div className="bg-navy-800 rounded-2xl p-8 border border-navy-700 text-center space-y-3">
+            <div className="text-3xl">✉️</div>
+            <div className="text-white font-bold text-base">Check your email</div>
+            <p className="text-gray-400 text-sm leading-relaxed">
+              We sent a login link to <span className="text-teal font-semibold">{email}</span>.
+              Click it to sign in — no password needed.
+            </p>
+            <button
+              onClick={() => { setSent(false); setEmail(""); }}
+              className="text-xs text-gray-600 hover:text-gray-400 transition-colors mt-2"
+            >
+              Use a different email
+            </button>
           </div>
-          <div>
-            <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-              Password
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              autoComplete="current-password"
-              className="w-full bg-navy border border-navy-700 text-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-teal transition-colors"
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-teal hover:bg-teal-light text-white font-bold py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        ) : (
+          <form
+            onSubmit={handleLogin}
+            className="bg-navy-800 rounded-2xl p-8 border border-navy-700 space-y-5"
           >
-            {loading ? "Signing in…" : "Sign In"}
-          </button>
-        </form>
+            {error && (
+              <div className="text-red-400 text-sm bg-red-900/20 border border-red-900/40 rounded-lg px-4 py-3">
+                {error}
+              </div>
+            )}
+            <div>
+              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                Email
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                autoFocus
+                autoComplete="email"
+                className="w-full bg-navy border border-navy-700 text-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-teal transition-colors placeholder-gray-600"
+                placeholder="you@ikirere.com"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-teal hover:bg-teal-light text-white font-bold py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? "Sending link…" : "Send login link"}
+            </button>
+          </form>
+        )}
 
         <p className="text-center text-gray-600 text-xs mt-6">
           Accounts are created by Jason. Contact him if you need access.
