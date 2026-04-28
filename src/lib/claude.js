@@ -275,58 +275,97 @@ When the user says "remember", "note that", "save this" — use create_team_note
 
 // ─── Main ask function ────────────────────────────────────────────────────────
 
+function cleanSchema(schema) {
+  // Strip fields Bedrock rejects, ensure type:object is present
+  const { $schema, additionalProperties, ...rest } = schema;
+  return {
+    type: "object",
+    ...rest,
+    // Recursively clean nested property schemas
+    ...(rest.properties ? {
+      properties: Object.fromEntries(
+        Object.entries(rest.properties).map(([k, v]) => {
+          const { $schema: _, ...clean } = v;
+          return [k, clean];
+        })
+      )
+    } : {}),
+  };
+}
+
 export async function askClaude({ userMessage, systemPrompt, tools, supabase }) {
-  // Convert tool registry to Anthropic tool format
+  // Convert tool registry to Anthropic/Bedrock tool format
   const anthropicTools = tools.map((t) => ({
     name: t.name,
     description: t.description,
-    input_schema: zodToJsonSchema(t.schema, { $refStrategy: "none" }),
+    input_schema: cleanSchema(zodToJsonSchema(t.schema, { $refStrategy: "none" })),
   }));
 
-  // Call via Supabase edge function — AWS creds live server-side, never in browser
   const { data: { session } } = await supabase.auth.getSession();
-  const res = await fetch(
-    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/claude-proxy`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${session?.access_token}`,
-      },
-      body: JSON.stringify({
-        system: systemPrompt,
-        tools: anthropicTools,
-        messages: [{ role: "user", content: userMessage }],
-        max_tokens: 2048,
-      }),
-    }
-  );
 
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err?.error?.message ?? `Proxy error ${res.status}`);
-  }
-
-  const response = await res.json();
-
-  // Execute any tool calls
-  const toolResults = [];
-  for (const block of response.content ?? []) {
-    if (block.type === "tool_use") {
-      const toolDef = tools.find((t) => t.name === block.name);
-      if (toolDef) {
-        const result = await toolDef.run(block.input);
-        toolResults.push(result);
+  const callProxy = async (messages) => {
+    const res = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/claude-proxy`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({
+          system: systemPrompt,
+          tools: anthropicTools,
+          messages,
+          max_tokens: 2048,
+        }),
       }
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err?.error?.message ?? err?.error?.type ?? `Proxy error ${res.status}`);
     }
-  }
+    return res.json();
+  };
 
-  // Extract text
-  const text = (response.content ?? [])
-    .filter((b) => b.type === "text")
-    .map((b) => b.text)
-    .join("\n")
-    .trim();
+  // Agentic loop — handles tool_use → tool_result turns
+  const messages = [{ role: "user", content: userMessage }];
+  const toolResults = [];
+  let text = "";
+
+  for (let i = 0; i < 5; i++) {
+    const response = await callProxy(messages);
+
+    // Collect text from this turn
+    const turnText = (response.content ?? [])
+      .filter((b) => b.type === "text")
+      .map((b) => b.text)
+      .join("\n")
+      .trim();
+    if (turnText) text = turnText;
+
+    // If no tool calls, we're done
+    const toolUseBlocks = (response.content ?? []).filter((b) => b.type === "tool_use");
+    if (toolUseBlocks.length === 0) break;
+
+    // Execute each tool call
+    const toolResultContent = [];
+    for (const block of toolUseBlocks) {
+      const toolDef = tools.find((t) => t.name === block.name);
+      const result = toolDef
+        ? await toolDef.run(block.input).catch((e) => `Error: ${e.message}`)
+        : `Unknown tool: ${block.name}`;
+      toolResults.push(result);
+      toolResultContent.push({
+        type: "tool_result",
+        tool_use_id: block.id,
+        content: String(result),
+      });
+    }
+
+    // Append assistant turn + tool results for next loop
+    messages.push({ role: "assistant", content: response.content });
+    messages.push({ role: "user", content: toolResultContent });
+  }
 
   return { text, toolResults };
 }
