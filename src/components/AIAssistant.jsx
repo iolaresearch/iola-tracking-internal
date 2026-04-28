@@ -95,13 +95,16 @@ export default function AIAssistant() {
       onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = "0 4px 20px rgba(14,205,183,0.35)"; }}
       title="IOLA AI">
         {open ? "×" : (
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-            {/* Satellite dish — space comms, fits IOLA */}
-            <path d="M3 17 L8 12"/>
-            <path d="M8 12 C8 8 12 4 16 4"/>
-            <path d="M8 12 C10 10 14 8 16 4"/>
-            <path d="M5 14 C6 11 9 8 14 7"/>
-            <circle cx="16" cy="4" r="1.2" fill="currentColor" stroke="none"/>
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            {/* Satellite body + solar panels */}
+            <rect x="8" y="8" width="4" height="4" rx="0.5"/>
+            <line x1="3" y1="10" x2="8" y2="10"/>
+            <line x1="12" y1="10" x2="17" y2="10"/>
+            <line x1="2" y1="8" x2="2" y2="12"/>
+            <line x1="18" y1="8" x2="18" y2="12"/>
+            <line x1="10" y1="3" x2="10" y2="8"/>
+            <line x1="10" y1="12" x2="10" y2="17"/>
+            <circle cx="10" cy="10" r="1" fill="currentColor" stroke="none"/>
           </svg>
         )}
       </button>
