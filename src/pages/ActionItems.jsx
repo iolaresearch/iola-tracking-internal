@@ -20,6 +20,8 @@ import { useActivity } from "../hooks/useActivity";
 import { notifyAssigned } from "../lib/notifications";
 import PriorityBadge from "../components/PriorityBadge";
 import Modal from "../components/Modal";
+import ConfirmDialog from "../components/ConfirmDialog";
+import { useConfirm } from "../hooks/useConfirm";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -340,6 +342,7 @@ export default function ActionItems() {
   const qc       = useQueryClient();
   const { log }  = useActivity();
   const [modal, setModal]                   = useState(null);
+  const { confirm, dialogProps }            = useConfirm();
   const [newGroupPrompt, setNewGroupPrompt] = useState(false);
   const [filterOwner, setFilterOwner]       = useState("All");
   const [filterStatus, setFilterStatus]     = useState("All");
@@ -537,7 +540,7 @@ export default function ActionItems() {
                   <Group label="Ungrouped" items={ungrouped}
                     onAddTask={() => openAddWithGroup("")}
                     onEdit={item => setModal({ mode: "edit", data: item })}
-                    onDelete={item => { if (window.confirm("Delete this task?")) remove.mutate(item); }}
+                    onDelete={async item => { if (await confirm("Delete task", "Remove this task permanently?")) remove.mutate(item); }}
                     onCycle={item => cycleStatus.mutate(item)} />
                 )}
                 {allGroups.map(group => {
@@ -548,7 +551,7 @@ export default function ActionItems() {
                     <Group key={group} label={group} items={groupItems} totalCount={totalInGroup}
                       onAddTask={() => openAddWithGroup(group)}
                       onEdit={item => setModal({ mode: "edit", data: item })}
-                      onDelete={item => { if (window.confirm("Delete this task?")) remove.mutate(item); }}
+                      onDelete={async item => { if (await confirm("Delete task", "Remove this task permanently?")) remove.mutate(item); }}
                       onCycle={item => cycleStatus.mutate(item)} />
                   );
                 })}
@@ -581,6 +584,7 @@ export default function ActionItems() {
       <Modal open={!!modal} onClose={() => setModal(null)} title={modal?.mode === "edit" ? "Edit Task" : "Add Task"}>
         {modal && <TaskForm initial={modal.data} existingGroups={allGroups} onSave={form => upsert.mutate(form)} onClose={() => setModal(null)} />}
       </Modal>
+      <ConfirmDialog {...dialogProps} />
     </div>
   );
 }

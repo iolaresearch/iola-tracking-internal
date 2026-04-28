@@ -57,6 +57,8 @@ export function useAlerts() {
   }, [userEmail]);
 
   const dismiss = useCallback(async (id) => {
+    // Optimistically remove from state immediately — don't wait for Realtime
+    setAlerts((prev) => prev.filter((a) => a.id !== id));
     await supabase.from("alerts").update({ dismissed: true }).eq("id", id);
   }, []);
 

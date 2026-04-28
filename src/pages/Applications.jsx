@@ -5,6 +5,8 @@ import { useActivity } from "../hooks/useActivity";
 import StatusBadge, { STATUS_STYLE } from "../components/StatusBadge";
 import PriorityBadge, { PRIORITY_COLOR } from "../components/PriorityBadge";
 import Modal from "../components/Modal";
+import ConfirmDialog from "../components/ConfirmDialog";
+import { useConfirm } from "../hooks/useConfirm";
 
 const STATUSES   = ["Not Yet Applied","Applied","In Progress","Accepted","Rejected","Pending"];
 const TYPES      = ["Accelerator","Grant","VC / Angel","Partnership","Academic"];
@@ -76,6 +78,7 @@ export default function Applications() {
   const [fType, setFType]         = useState("All");
   const [fPriority, setFPriority] = useState("All");
   const [modal, setModal]         = useState(null);
+  const { confirm, dialogProps }  = useConfirm();
 
   const { data: apps = [], isLoading } = useQuery({
     queryKey: ["applications"],
@@ -211,7 +214,7 @@ export default function Applications() {
                     <td style={{ padding: "11px 16px 11px 4px", whiteSpace: "nowrap" }}>
                       <div style={{ display: "flex", gap: 4 }}>
                         <button className="iola-btn iola-btn-ghost" style={{ padding: "3px 8px", fontSize: 11 }} onClick={() => setModal({ mode: "edit", data: row })}>Edit</button>
-                        <button className="iola-btn iola-btn-danger" style={{ padding: "3px 8px", fontSize: 11 }} onClick={() => { if (confirm(`Delete "${row.name}"?`)) remove.mutate({ id: row.id, name: row.name }); }}>Del</button>
+                        <button className="iola-btn iola-btn-danger" style={{ padding: "3px 8px", fontSize: 11 }} onClick={async () => { if (await confirm("Delete application", `Remove "${row.name}" permanently?`)) remove.mutate({ id: row.id, name: row.name }); }}>Del</button>
                       </div>
                     </td>
                   </tr>
@@ -225,6 +228,7 @@ export default function Applications() {
       <Modal open={!!modal} onClose={() => setModal(null)} title={modal?.mode === "edit" ? "Edit Application" : "New Application"}>
         {modal && <AppForm initial={modal.data} onSave={f => upsert.mutate(f)} onClose={() => setModal(null)} />}
       </Modal>
+      <ConfirmDialog {...dialogProps} />
     </div>
   );
 }

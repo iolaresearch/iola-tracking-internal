@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "../lib/supabase";
 import { useActivity } from "../hooks/useActivity";
 import Modal from "../components/Modal";
+import ConfirmDialog from "../components/ConfirmDialog";
+import { useConfirm } from "../hooks/useConfirm";
 
 const CATEGORIES = ["General","Contact","Context","Rule","Fundraising","Engineering","Research"];
 const KB_STYLE = {
@@ -95,7 +97,8 @@ export default function KnowledgeBase() {
   const { log } = useActivity();
   const [fCat, setFCat]     = useState("All");
   const [search, setSearch] = useState("");
-  const [modal, setModal]   = useState(null);
+  const [modal, setModal]        = useState(null);
+  const { confirm, dialogProps } = useConfirm();
 
   const { data: notes = [], isLoading } = useQuery({
     queryKey: ["team_notes"],
@@ -184,7 +187,7 @@ export default function KnowledgeBase() {
           {filtered.map(note => (
             <NoteCard key={note.id} note={note}
               onEdit={() => setModal({ mode: "edit", data: note })}
-              onDel={() => { if (confirm(`Delete "${note.title}"?`)) remove.mutate(note); }} />
+              onDel={async () => { if (await confirm("Delete note", `Remove "${note.title}" permanently?`)) remove.mutate(note); }} />
           ))}
         </div>
       )}
@@ -192,6 +195,7 @@ export default function KnowledgeBase() {
       <Modal open={!!modal} onClose={() => setModal(null)} title={modal?.mode === "edit" ? "Edit Note" : "New Note"}>
         {modal && <NoteForm initial={modal.data} onSave={f => upsert.mutate(f)} onClose={() => setModal(null)} />}
       </Modal>
+      <ConfirmDialog {...dialogProps} />
     </div>
   );
 }

@@ -4,6 +4,8 @@ import { supabase } from "../lib/supabase";
 import { useActivity } from "../hooks/useActivity";
 import StatusBadge, { STATUS_STYLE } from "../components/StatusBadge";
 import Modal from "../components/Modal";
+import ConfirmDialog from "../components/ConfirmDialog";
+import { useConfirm } from "../hooks/useConfirm";
 
 const STATUSES = ["Active","Pending","Warm","Cold","Done"];
 const EMPTY = { name:"", role:"", region:"", status:"Warm", last_contact:"", notes:"", next_step:"", owner:"Jason" };
@@ -93,8 +95,9 @@ function ContactCard({ c, onEdit, onDel, onStatusChange }) {
 export default function Outreach() {
   const qc = useQueryClient();
   const { log } = useActivity();
-  const [fStatus, setFStatus] = useState("All");
-  const [modal, setModal]     = useState(null);
+  const [fStatus, setFStatus]    = useState("All");
+  const [modal, setModal]        = useState(null);
+  const { confirm, dialogProps } = useConfirm();
 
   const { data: contacts = [], isLoading } = useQuery({
     queryKey: ["outreach"],
@@ -169,7 +172,7 @@ export default function Outreach() {
           {filtered.map(c => (
             <ContactCard key={c.id} c={c}
               onEdit={() => setModal({ mode: "edit", data: c })}
-              onDel={() => { if (confirm(`Delete ${c.name}?`)) remove.mutate({ id: c.id, name: c.name }); }}
+              onDel={async () => { if (await confirm("Delete contact", `Remove ${c.name} permanently?`)) remove.mutate({ id: c.id, name: c.name }); }}
               onStatusChange={(id, status, name) => updateStatus.mutate({ id, status, name })} />
           ))}
         </div>
@@ -178,6 +181,7 @@ export default function Outreach() {
       <Modal open={!!modal} onClose={() => setModal(null)} title={modal?.mode === "edit" ? "Edit Contact" : "New Contact"}>
         {modal && <ContactForm initial={modal.data} onSave={f => upsert.mutate(f)} onClose={() => setModal(null)} />}
       </Modal>
+      <ConfirmDialog {...dialogProps} />
     </div>
   );
 }
