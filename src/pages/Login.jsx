@@ -23,18 +23,8 @@ export default function Login() {
     <div style={{ minHeight: "100vh", background: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
       <div style={{ width: "100%", maxWidth: 340 }}>
         <div style={{ textAlign: "center", marginBottom: 36 }}>
-          <div style={{
-            width: 44, height: 44, borderRadius: 12, margin: "0 auto 16px",
-            background: "var(--a-dim)", border: "1px solid var(--a-border)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}>
-            <span style={{ fontSize: 11, fontWeight: 800, color: "var(--accent)", letterSpacing: "-0.03em" }}>IOL</span>
-          </div>
-          <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(14,205,183,0.65)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>
-            Ikirere Orbital Labs Africa
-          </div>
-          <h1 style={{ fontSize: 28, fontWeight: 800, letterSpacing: "-0.04em", color: "var(--t)", lineHeight: 1 }}>IOLA</h1>
-          <p style={{ color: "var(--tm)", fontSize: 12, marginTop: 5, fontWeight: 500 }}>Internal Operations Platform</p>
+          <img src="/iola-logo.png" alt="Ikirere Orbital Labs Africa" style={{ width: 180, height: "auto", margin: "0 auto 16px", display: "block" }} />
+          <p style={{ color: "var(--tm)", fontSize: 12, fontWeight: 500 }}>Internal Operations Platform</p>
         </div>
 
         {sent ? (
