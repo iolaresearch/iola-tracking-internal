@@ -26,7 +26,7 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; background: var(--bg); color: var(--t); font-family: var(--font); }
-#root { height: 100%; display: flex; }
+#root { height: 100%; display: flex; width: 100%; }
 * { -webkit-font-smoothing: antialiased; }
 
 ::-webkit-scrollbar { width: 4px; height: 4px; }
