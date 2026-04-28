@@ -36,9 +36,11 @@ export function buildTools({ supabase, apps, outreach, items, notes, log, qc }) 
         owner:            z.string().optional(),
       }),
       run: async (args) => {
+        // Strip any fields not in the applications schema
+        const { owners: _o, funding: _f, next: _n, ...safeArgs } = args;
         const { data, error } = await supabase.from("applications").insert({
-          ...args, status: args.status ?? "Not Yet Applied", priority: args.priority ?? "Medium",
-          owner: args.owner ?? "Jason", deadline: args.deadline || null,
+          ...safeArgs, status: safeArgs.status ?? "Not Yet Applied", priority: safeArgs.priority ?? "Medium",
+          owner: safeArgs.owner ?? "Jason", deadline: safeArgs.deadline || null,
         }).select().single();
         if (error || !data) throw new Error(error?.message ?? "Insert failed: no data returned");
         captureCreate("application", data.id);
@@ -66,8 +68,10 @@ export function buildTools({ supabase, apps, outreach, items, notes, log, qc }) 
         owner:            z.string().optional(),
       }),
       run: async ({ id, ...fields }) => {
+        // Strip columns that don't exist on applications
+        const { owners: _o, funding: _f, next: _n, ...safeFields } = fields;
         await captureUpdate("application", id);
-        await supabase.from("applications").update(fields).eq("id", id);
+        await supabase.from("applications").update(safeFields).eq("id", id);
         const name = apps.find((a) => a.id === id)?.name ?? id;
         await log({ action: `AI: updated ${Object.keys(fields).join(", ")}`, entityType: "application", entityId: id, entityName: name });
         invalidate(["applications","activity_log"]);
@@ -348,6 +352,14 @@ ${items.map((i) => {
 
 GROUPS: ${groups.length ? groups.join(", ") : "none yet"}
 ════════════════════
+
+════ EXACT FIELD NAMES (use these precisely) ════
+applications: name, type, region, amount, fund_description, status, priority, next_step, notes, deadline, contact_name, owner
+  — NO "funding", NO "owners", NO "next" — those columns do not exist
+outreach: name, role, region, status, last_contact, notes, next_step, owner
+action_items: title, description, owner, owners (text array), due_date, status, priority, week_label, sort_order
+team_notes: title, body, category, created_by
+════════════════════════════════════════════════
 
 When the user says "remember", "note that", "save this" — use create_team_note.`;
 }
