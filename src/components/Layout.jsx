@@ -71,8 +71,20 @@ export default function Layout() {
         display: "flex", flexDirection: "column",
       }}>
         {/* Logo */}
-        <div style={{ padding: "14px 15px 13px", borderBottom: "1px solid var(--b)" }}>
-          <img src="/iola-logo.png" alt="Ikirere Orbital Labs Africa" style={{ width: 160, height: "auto", display: "block" }} />
+        <div style={{ padding: "18px 15px 15px", borderBottom: "1px solid var(--b)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+            <div style={{
+              width: 28, height: 28, borderRadius: 7, flexShrink: 0,
+              background: "var(--a-dim)", border: "1px solid var(--a-border)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <img src="/iola-logo.png" alt="IOLA" style={{ width: 20, height: 20, objectFit: "contain" }} />
+            </div>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: "-0.03em", color: "var(--t)", lineHeight: 1 }}>IOLA</div>
+              <div style={{ fontSize: 9.5, color: "rgba(14,205,183,0.65)", fontWeight: 600, letterSpacing: "0.01em", marginTop: 2 }}>Ikirere Orbital Labs</div>
+            </div>
+          </div>
         </div>
 
         {/* Nav */}
