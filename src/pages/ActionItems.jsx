@@ -38,17 +38,13 @@ const EMPTY = {
   status: "To Do", priority: "High", week_label: "", sort_order: 0,
 };
 
-const inputCls =
-  "w-full bg-navy border border-navy-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-teal transition-colors placeholder-gray-600";
-
 const OWNER_BADGE = {
-  Jason:          "bg-teal/15 text-teal",
-  Salami:         "bg-blue-900/40 text-blue-300",
-  Abigail:        "bg-purple-900/40 text-purple-300",
-  Ignatius:       "bg-yellow-900/40 text-yellow-300",
-  Alph:           "bg-pink-900/40 text-pink-300",
-  "Jason + Alph": "bg-teal/10 text-teal",
-  All:            "bg-green-900/40 text-green-300",
+  Jason:    { bg: "rgba(14,205,183,0.12)",  c: "#0ECDB7" },
+  Salami:   { bg: "rgba(96,165,250,0.12)",  c: "#60A5FA" },
+  Abigail:  { bg: "rgba(192,132,252,0.12)", c: "#C084FC" },
+  Ignatius: { bg: "rgba(253,211,77,0.12)",  c: "#FCD34D" },
+  Alph:     { bg: "rgba(244,114,182,0.12)", c: "#F472B6" },
+  All:      { bg: "rgba(74,222,128,0.12)",  c: "#4ADE80" },
 };
 
 const STATUS_CYCLE = { "To Do": "In Progress", "In Progress": "Done", "Done": "To Do" };
@@ -62,12 +58,10 @@ const PRIORITY_COLORS = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function Field({ label, children }) {
+function Field({ label, children, full }) {
   return (
-    <div>
-      <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
-        {label}
-      </label>
+    <div style={{ gridColumn: full ? "1 / -1" : "span 1" }}>
+      <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: "var(--tf)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 5 }}>{label}</label>
       {children}
     </div>
   );
@@ -87,95 +81,55 @@ function TaskForm({ initial, existingGroups, onSave, onClose }) {
   };
 
   return (
-    <>
-      <div className="space-y-4">
-        <Field label="Title">
-          <input value={form.title} onChange={(e) => set("title", e.target.value)} className={inputCls} autoFocus />
-        </Field>
-        <Field label="Description">
-          <textarea value={form.description} onChange={(e) => set("description", e.target.value)} rows={3} className={inputCls + " resize-none"} />
-        </Field>
-
-        <Field label="Assigned to">
-          <div className="flex flex-wrap gap-2 mt-1">
-            {OWNERS.map((name) => {
-              const selected = form.owners.includes(name);
-              return (
-                <button
-                  key={name}
-                  type="button"
-                  onClick={() => toggleOwner(name)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                    selected
-                      ? "bg-teal/20 border-teal/60 text-teal"
-                      : "bg-navy border-navy-700 text-gray-400 hover:text-white hover:border-gray-500"
-                  }`}
-                >
-                  {selected && <span className="mr-1">✓</span>}
-                  {name}
-                </button>
-              );
-            })}
-          </div>
-          {form.owners.length === 0 && (
-            <p className="text-red-400 text-xs mt-1">Select at least one person.</p>
-          )}
-        </Field>
-
-        <div className="grid grid-cols-2 gap-4">
-          <Field label="Due Date">
-            <input type="date" value={form.due_date || ""} onChange={(e) => set("due_date", e.target.value)} className={inputCls} />
-          </Field>
-          <Field label="Status">
-            <select value={form.status} onChange={(e) => set("status", e.target.value)} className={inputCls}>
-              {STATUSES.map((s) => <option key={s}>{s}</option>)}
-            </select>
-          </Field>
-          <Field label="Priority">
-            <select value={form.priority} onChange={(e) => set("priority", e.target.value)} className={inputCls}>
-              {PRIORITIES.map((p) => <option key={p}>{p}</option>)}
-            </select>
-          </Field>
-          <Field label="Group">
-            <input
-              list="group-options"
-              value={form.week_label}
-              onChange={(e) => set("week_label", e.target.value)}
-              className={inputCls}
-              placeholder="Select or create…"
-            />
-            <datalist id="group-options">
-              {existingGroups.map((g) => <option key={g} value={g} />)}
-            </datalist>
-          </Field>
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+      <Field label="Title" full><input value={form.title} onChange={e => set("title", e.target.value)} className="iola-input" autoFocus /></Field>
+      <Field label="Description" full><textarea value={form.description} onChange={e => set("description", e.target.value)} rows={2} className="iola-input" style={{ resize: "none" }} /></Field>
+      <Field label="Assigned to" full>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 3 }}>
+          {OWNERS.map(name => {
+            const ob = OWNER_BADGE[name];
+            const sel = form.owners.includes(name);
+            return (
+              <button key={name} type="button" onClick={() => toggleOwner(name)} style={{
+                padding: "5px 11px", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer",
+                border: `1px solid ${sel ? (ob?.c + "55") : "var(--b)"}`,
+                background: sel ? (ob?.bg || "var(--a-dim)") : "transparent",
+                color: sel ? (ob?.c || "var(--accent)") : "var(--tm)",
+                transition: "all 0.12s", fontFamily: "var(--font)",
+              }}>{sel ? "✓ " : ""}{name}</button>
+            );
+          })}
         </div>
-
-        {/* Notify toggle */}
-        <label className="flex items-center gap-3 cursor-pointer select-none">
-          <div
-            onClick={() => setNotify((n) => !n)}
-            className={`w-9 h-5 rounded-full transition-colors relative ${notify ? "bg-teal" : "bg-navy-700"}`}
-          >
-            <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${notify ? "translate-x-4" : "translate-x-0.5"}`} />
+        {form.owners.length === 0 && <p style={{ fontSize: 11, color: "#F87171", marginTop: 4 }}>Select at least one person.</p>}
+      </Field>
+      <Field label="Due Date"><input type="date" value={form.due_date || ""} onChange={e => set("due_date", e.target.value)} className="iola-input" /></Field>
+      <Field label="Status">
+        <select value={form.status} onChange={e => set("status", e.target.value)} className="iola-input">
+          {STATUSES.map(s => <option key={s}>{s}</option>)}
+        </select>
+      </Field>
+      <Field label="Priority">
+        <select value={form.priority} onChange={e => set("priority", e.target.value)} className="iola-input">
+          {PRIORITIES.map(p => <option key={p}>{p}</option>)}
+        </select>
+      </Field>
+      <Field label="Group">
+        <input list="group-options" value={form.week_label} onChange={e => set("week_label", e.target.value)} className="iola-input" placeholder="Select or create…" />
+        <datalist id="group-options">{existingGroups.map(g => <option key={g} value={g} />)}</datalist>
+      </Field>
+      <Field label="Notify by email" full>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }} onClick={() => setNotify(n => !n)}>
+          <div style={{ width: 34, height: 18, borderRadius: 9, position: "relative", background: notify ? "var(--accent)" : "var(--b2)", transition: "background 0.15s" }}>
+            <div style={{ position: "absolute", top: 2, width: 14, height: 14, borderRadius: "50%", background: "white", transition: "transform 0.15s", transform: notify ? "translateX(18px)" : "translateX(2px)" }} />
           </div>
-          <span className="text-xs text-gray-400">
-            Notify assigned people by email
-            {form.owners.length > 0 && <span className="text-gray-600 ml-1">(sends to those with emails on file)</span>}
-          </span>
-        </label>
+          <span style={{ fontSize: 12, color: "var(--tm)" }}>Send email to newly assigned people</span>
+        </div>
+      </Field>
+      <div style={{ gridColumn: "1/-1", display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 4 }}>
+        <button className="iola-btn iola-btn-ghost" onClick={onClose}>Cancel</button>
+        <button className="iola-btn iola-btn-primary" onClick={() => onSave({ ...form, notify })} disabled={!form.title.trim() || !form.owners.length}>Save</button>
       </div>
-
-      <div className="flex justify-end gap-3 mt-6">
-        <button onClick={onClose} className="px-4 py-2 text-sm text-gray-400 hover:text-white border border-navy-700 rounded-lg transition-colors">Cancel</button>
-        <button
-          onClick={() => onSave({ ...form, notify })}
-          disabled={!form.title.trim() || form.owners.length === 0}
-          className="px-5 py-2 text-sm font-bold bg-teal text-white rounded-lg hover:bg-teal-light transition-colors disabled:opacity-40"
-        >
-          Save
-        </button>
-      </div>
-    </>
+    </div>
   );
 }
 
@@ -209,60 +163,42 @@ function TaskCard({ item, onEdit, onDelete, onCycle, dragHandleProps = {} }) {
     new Date(item.due_date) >= new Date();
 
   return (
-    <div className={`bg-navy-800 rounded-xl border p-4 flex items-start gap-3 transition-colors ${
-      isDone ? "opacity-50 border-navy-700" :
-      item.priority === "Critical" ? "border-red-900/50 hover:border-red-900/70" :
-      "border-navy-700 hover:border-navy-600"
-    }`}>
-      {/* Drag handle */}
-      <div
-        {...dragHandleProps}
-        className="mt-1 flex-shrink-0 cursor-grab active:cursor-grabbing text-gray-700 hover:text-gray-500 transition-colors select-none"
-        title="Drag to reorder"
-      >
-        ⋮⋮
-      </div>
-
-      {/* Status toggle */}
-      <button
-        onClick={() => onCycle(item)}
-        title={`Mark as ${STATUS_CYCLE[item.status]}`}
-        className={`mt-0.5 w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all hover:scale-110 ${
-          isDone ? "border-green-600 bg-green-900/30" :
-          isInProgress ? "border-amber" :
-          "border-gray-600 hover:border-teal"
-        }`}
-      >
-        {isDone && <span className="text-green-400 text-xs">✓</span>}
-        {isInProgress && <span className="w-2 h-2 rounded-full bg-amber block" />}
+    <div style={{
+      display: "flex", alignItems: "flex-start", gap: 10,
+      padding: "10px 13px", borderRadius: 8,
+      border: `1px solid ${isDone ? "rgba(255,255,255,0.03)" : item.priority === "Critical" ? "rgba(248,113,113,0.14)" : "var(--b)"}`,
+      background: isDone ? "rgba(255,255,255,0.01)" : "var(--s1)",
+      opacity: isDone ? 0.5 : 1, transition: "opacity 0.2s",
+    }}>
+      <div {...dragHandleProps} style={{ marginTop: 2, flexShrink: 0, cursor: "grab", color: "rgba(255,255,255,0.15)", userSelect: "none", fontSize: 12 }} title="Drag to reorder">⋮⋮</div>
+      <button onClick={() => onCycle(item)} title={`Mark ${STATUS_CYCLE[item.status]}`} style={{
+        marginTop: 2, width: 17, height: 17, borderRadius: "50%", flexShrink: 0,
+        border: `1.5px solid ${isDone ? "#4ADE80" : isInProgress ? "#F5A623" : "rgba(255,255,255,0.18)"}`,
+        background: isDone ? "rgba(74,222,128,0.14)" : "transparent",
+        cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
+      }}>
+        {isDone       && <span style={{ fontSize: 8, color: "#4ADE80" }}>✓</span>}
+        {isInProgress && <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#F5A623", display: "block" }} />}
       </button>
-
-      {/* Content */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className={`text-sm font-semibold leading-tight ${isDone ? "line-through text-gray-500" : "text-white"}`}>
-            {item.title}
-          </span>
-          <PriorityBadge priority={item.priority} />
-          {(item.owners?.length ? item.owners : [item.owner]).filter(Boolean).map((o) => (
-            <span key={o} className={`px-2 py-0.5 rounded-full text-xs font-semibold ${OWNER_BADGE[o] ?? "bg-gray-800 text-gray-400"}`}>
-              {o}
-            </span>
-          ))}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
+          <PriorityBadge priority={item.priority} dot />
+          <span style={{ fontSize: 13, fontWeight: 600, color: isDone ? "var(--tm)" : "var(--t)", textDecoration: isDone ? "line-through" : "none" }}>{item.title}</span>
+          {(item.owners?.length ? item.owners : [item.owner]).filter(Boolean).map(o => {
+            const ob = OWNER_BADGE[o] || { bg: "rgba(255,255,255,0.06)", c: "rgba(232,238,244,0.38)" };
+            return <span key={o} style={{ fontSize: 10, fontWeight: 700, color: ob.c, background: ob.bg, padding: "1px 6px", borderRadius: 100 }}>{o}</span>;
+          })}
         </div>
-        {item.description && <p className="text-gray-400 text-xs mt-1 leading-relaxed">{item.description}</p>}
+        {item.description && <p style={{ fontSize: 12, color: "var(--tm)", marginTop: 3, lineHeight: 1.55 }}>{item.description}</p>}
         {item.due_date && (
-          <div className={`text-xs mt-1.5 font-medium ${dueSoon ? "text-red-400" : "text-gray-600"}`}>
-            Due {new Date(item.due_date).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
-            {dueSoon && " ⚡"}
-          </div>
+          <span style={{ fontSize: 11, color: dueSoon ? "#F87171" : "var(--tff)", marginTop: 4, display: "block", fontWeight: dueSoon ? 600 : 400 }}>
+            Due {new Date(item.due_date).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}{dueSoon ? " ⚡" : ""}
+          </span>
         )}
       </div>
-
-      {/* Actions */}
-      <div className="flex gap-1 shrink-0">
-        <button onClick={() => onEdit(item)} className="px-2 py-1 text-xs border border-navy-700 rounded-md text-gray-400 hover:text-white transition-colors">Edit</button>
-        <button onClick={() => onDelete(item)} className="px-2 py-1 text-xs border border-red-900/50 rounded-md text-red-400 hover:bg-red-900/20 transition-colors">Del</button>
+      <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+        <button className="iola-btn iola-btn-ghost" style={{ padding: "2px 7px", fontSize: 11 }} onClick={() => onEdit(item)}>Edit</button>
+        <button className="iola-btn iola-btn-danger" style={{ padding: "2px 7px", fontSize: 11 }} onClick={() => onDelete(item)}>Del</button>
       </div>
     </div>
   );
@@ -275,18 +211,18 @@ function Group({ label, items, totalCount, onAddTask, onEdit, onDelete, onCycle 
   const total = totalCount ?? items.length;
   return (
     <div>
-      <div className="flex items-center gap-3 mb-3">
-        <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest shrink-0">{label}</h2>
-        <div className="flex-1 h-px bg-navy-700" />
-        <span className="text-xs text-gray-600 shrink-0">{done}/{total}</span>
-        <button onClick={onAddTask} className="text-xs text-gray-600 hover:text-teal transition-colors shrink-0">+ task</button>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+        <span style={{ fontSize: 10, fontWeight: 700, color: "var(--tm)", textTransform: "uppercase", letterSpacing: "0.08em", whiteSpace: "nowrap" }}>{label}</span>
+        <div style={{ flex: 1, height: 1, background: "var(--b)" }} />
+        <span style={{ fontSize: 10, color: "var(--tff)", fontWeight: 600 }}>{done}/{total}</span>
+        <button onClick={onAddTask} style={{ fontSize: 11, color: "var(--tff)", background: "none", border: "none", cursor: "pointer", padding: "2px 4px", fontFamily: "var(--font)", fontWeight: 600 }}
+                onMouseEnter={e => e.currentTarget.style.color = "var(--accent)"}
+                onMouseLeave={e => e.currentTarget.style.color = "var(--tff)"}>+ task</button>
       </div>
-      <SortableContext items={items.map((i) => i.id)} strategy={verticalListSortingStrategy}>
-        <div className="space-y-2">
-          {items.length === 0 && <p className="text-gray-700 text-xs italic pl-1">No tasks match filters.</p>}
-          {items.map((item) => (
-            <SortableTaskCard key={item.id} item={item} onEdit={onEdit} onDelete={onDelete} onCycle={onCycle} />
-          ))}
+      <SortableContext items={items.map(i => i.id)} strategy={verticalListSortingStrategy}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+          {items.length === 0 && <p style={{ color: "var(--tff)", fontSize: 12, paddingLeft: 2, fontStyle: "italic" }}>No tasks match filters.</p>}
+          {items.map(item => <SortableTaskCard key={item.id} item={item} onEdit={onEdit} onDelete={onDelete} onCycle={onCycle} />)}
         </div>
       </SortableContext>
     </div>
@@ -300,28 +236,22 @@ function NewGroupPrompt({ existingGroups, onConfirm, onClose }) {
   return (
     <Modal open onClose={onClose} title="New Group">
       <Field label="Group Name">
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter" && name.trim()) onConfirm(name.trim()); }}
-          className={inputCls}
-          placeholder="e.g. June Sprint, Q3 Fundraising…"
-          autoFocus
-        />
+        <input value={name} onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && name.trim()) onConfirm(name.trim()); }}
+               className="iola-input" placeholder="e.g. June Sprint, Q3 Fundraising…" autoFocus />
       </Field>
       {existingGroups.length > 0 && (
-        <div className="mt-3">
-          <p className="text-xs text-gray-500 mb-2">Existing groups:</p>
-          <div className="flex flex-wrap gap-1.5">
-            {existingGroups.map((g) => (
-              <button key={g} onClick={() => onConfirm(g)} className="px-2.5 py-1 rounded-lg text-xs bg-navy-700 text-gray-300 hover:bg-navy-600 hover:text-white transition-colors">{g}</button>
+        <div style={{ marginTop: 12 }}>
+          <p style={{ fontSize: 11, color: "var(--tf)", marginBottom: 7 }}>Existing groups:</p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {existingGroups.map(g => (
+              <button key={g} onClick={() => onConfirm(g)} className="iola-btn iola-btn-ghost" style={{ fontSize: 11, padding: "4px 9px" }}>{g}</button>
             ))}
           </div>
         </div>
       )}
-      <div className="flex justify-end gap-3 mt-6">
-        <button onClick={onClose} className="px-4 py-2 text-sm text-gray-400 hover:text-white border border-navy-700 rounded-lg">Cancel</button>
-        <button onClick={() => { if (name.trim()) onConfirm(name.trim()); }} disabled={!name.trim()} className="px-5 py-2 text-sm font-bold bg-teal text-white rounded-lg hover:bg-teal-light disabled:opacity-40">Create Group</button>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 20 }}>
+        <button className="iola-btn iola-btn-ghost" onClick={onClose}>Cancel</button>
+        <button className="iola-btn iola-btn-primary" onClick={() => { if (name.trim()) onConfirm(name.trim()); }} disabled={!name.trim()}>Create Group</button>
       </div>
     </Modal>
   );
@@ -362,60 +292,39 @@ function CalendarView({ items, onEdit }) {
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
 
   return (
-    <div className="bg-navy-800 rounded-xl border border-navy-700 overflow-hidden">
-      {/* Calendar header */}
-      <div className="flex items-center justify-between px-5 py-4 border-b border-navy-700">
-        <button onClick={prevMonth} className="text-gray-400 hover:text-white text-lg px-2 transition-colors">‹</button>
-        <span className="text-white font-bold text-sm">{monthName}</span>
-        <button onClick={nextMonth} className="text-gray-400 hover:text-white text-lg px-2 transition-colors">›</button>
+    <div style={{ background: "var(--s1)", border: "1px solid var(--b)", borderRadius: 10, overflow: "hidden" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", borderBottom: "1px solid var(--b)" }}>
+        <button onClick={prevMonth} style={{ background: "none", border: "none", color: "var(--tm)", cursor: "pointer", fontSize: 18, padding: "0 8px" }}
+                onMouseEnter={e => e.currentTarget.style.color = "var(--t)"} onMouseLeave={e => e.currentTarget.style.color = "var(--tm)"}>‹</button>
+        <span style={{ fontWeight: 700, fontSize: 13, color: "var(--t)" }}>{monthName}</span>
+        <button onClick={nextMonth} style={{ background: "none", border: "none", color: "var(--tm)", cursor: "pointer", fontSize: 18, padding: "0 8px" }}
+                onMouseEnter={e => e.currentTarget.style.color = "var(--t)"} onMouseLeave={e => e.currentTarget.style.color = "var(--tm)"}>›</button>
       </div>
-
-      {/* Day headers */}
-      <div className="grid grid-cols-7 border-b border-navy-700">
-        {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map((d) => (
-          <div key={d} className="px-2 py-2 text-center text-xs font-bold text-gray-500 uppercase">{d}</div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", borderBottom: "1px solid var(--b)" }}>
+        {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d => (
+          <div key={d} style={{ padding: "8px", textAlign: "center", fontSize: 10, fontWeight: 700, color: "var(--tff)", textTransform: "uppercase" }}>{d}</div>
         ))}
       </div>
-
-      {/* Days grid */}
-      <div className="grid grid-cols-7">
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)" }}>
         {cells.map((day, i) => {
-          if (!day) return <div key={`e-${i}`} className="min-h-[80px] border-b border-r border-navy-700/50" />;
+          if (!day) return <div key={`e-${i}`} style={{ minHeight: 80, borderBottom: "1px solid rgba(255,255,255,0.03)", borderRight: "1px solid rgba(255,255,255,0.03)" }} />;
           const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
           const dayItems = itemsByDate[dateStr] ?? [];
           const isToday = dateStr === todayStr;
           const isPast = dateStr < todayStr;
           return (
-            <div
-              key={dateStr}
-              className={`min-h-[80px] border-b border-r border-navy-700/50 p-1.5 ${isPast && !isToday ? "opacity-60" : ""}`}
-            >
-              <div className={`text-xs font-bold mb-1 w-5 h-5 flex items-center justify-center rounded-full ${
-                isToday ? "bg-teal text-white" : "text-gray-500"
-              }`}>
-                {day}
-              </div>
-              <div className="space-y-0.5">
-                {dayItems.slice(0, 3).map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => onEdit(item)}
-                    className="w-full text-left px-1.5 py-0.5 rounded text-xs truncate transition-colors hover:opacity-80"
-                    style={{
-                      background: PRIORITY_COLORS[item.priority] + "22",
-                      color: PRIORITY_COLORS[item.priority],
-                      borderLeft: `2px solid ${PRIORITY_COLORS[item.priority]}`,
-                      textDecoration: item.status === "Done" ? "line-through" : "none",
-                      opacity: item.status === "Done" ? 0.5 : 1,
-                    }}
-                    title={item.title}
-                  >
-                    {item.title}
-                  </button>
+            <div key={dateStr} style={{ minHeight: 80, borderBottom: "1px solid rgba(255,255,255,0.03)", borderRight: "1px solid rgba(255,255,255,0.03)", padding: 6, opacity: isPast && !isToday ? 0.6 : 1 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 4, width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "50%", background: isToday ? "var(--accent)" : "transparent", color: isToday ? "#021A17" : "var(--tff)" }}>{day}</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                {dayItems.slice(0, 3).map(item => (
+                  <button key={item.id} onClick={() => onEdit(item)} title={item.title} style={{
+                    width: "100%", textAlign: "left", padding: "2px 5px", borderRadius: 4, fontSize: 10, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                    background: PRIORITY_COLORS[item.priority] + "22", color: PRIORITY_COLORS[item.priority],
+                    borderLeft: `2px solid ${PRIORITY_COLORS[item.priority]}`, border: "none", cursor: "pointer",
+                    textDecoration: item.status === "Done" ? "line-through" : "none", opacity: item.status === "Done" ? 0.5 : 1, fontFamily: "var(--font)",
+                  }}>{item.title}</button>
                 ))}
-                {dayItems.length > 3 && (
-                  <div className="text-xs text-gray-600 pl-1">+{dayItems.length - 3} more</div>
-                )}
+                {dayItems.length > 3 && <div style={{ fontSize: 10, color: "var(--tff)", paddingLeft: 2 }}>+{dayItems.length - 3} more</div>}
               </div>
             </div>
           );
@@ -569,117 +478,91 @@ export default function ActionItems() {
   };
 
   return (
-    <div className="p-8">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+    <div className="fade-in">
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 22 }}>
         <div>
-          <h1 className="text-white text-2xl font-extrabold tracking-tight">Action Items</h1>
-          <p className="text-gray-500 text-sm mt-1">
-            {done}/{items.length} complete · {critical} critical remaining · {allGroups.length} groups
+          <h1 style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-0.03em", color: "var(--t)" }}>Action Items</h1>
+          <p style={{ color: "var(--tm)", fontSize: 13, marginTop: 4, fontWeight: 500 }}>
+            {done}/{items.length} complete · {critical} critical open · {allGroups.length} groups
           </p>
         </div>
-        <div className="flex gap-2">
-          {/* View toggle */}
-          <div className="flex bg-navy-800 border border-navy-700 rounded-lg p-0.5">
-            <button
-              onClick={() => setView("list")}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${view === "list" ? "bg-teal text-white" : "text-gray-400 hover:text-white"}`}
-            >
-              List
-            </button>
-            <button
-              onClick={() => setView("calendar")}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${view === "calendar" ? "bg-teal text-white" : "text-gray-400 hover:text-white"}`}
-            >
-              Calendar
-            </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ display: "flex", background: "var(--s1)", border: "1px solid var(--b)", borderRadius: 7, padding: 2 }}>
+            {["list","calendar"].map(v => (
+              <button key={v} onClick={() => setView(v)} style={{
+                padding: "5px 12px", borderRadius: 5, fontSize: 12, fontWeight: 600, cursor: "pointer", border: "none",
+                background: view === v ? "var(--accent)" : "transparent",
+                color: view === v ? "#021A17" : "var(--tm)", fontFamily: "var(--font)", transition: "all 0.12s",
+              }}>{v === "list" ? "List" : "Calendar"}</button>
+            ))}
           </div>
-          <button onClick={() => setNewGroupPrompt(true)} className="px-4 py-2 bg-navy-800 border border-navy-700 text-gray-300 text-sm font-semibold rounded-lg hover:border-gray-500 hover:text-white transition-colors">+ New Group</button>
-          <button onClick={() => openAddWithGroup(allGroups[0] ?? "")} className="px-4 py-2 bg-teal text-white text-sm font-bold rounded-lg hover:bg-teal-light transition-colors">+ Add Task</button>
+          <button className="iola-btn iola-btn-ghost" onClick={() => setNewGroupPrompt(true)}>+ New Group</button>
+          <button className="iola-btn iola-btn-primary" onClick={() => openAddWithGroup(allGroups[0] ?? "")}>+ Add Task</button>
         </div>
       </div>
 
-      {/* Progress bar */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between text-xs text-gray-500 mb-1.5">
-          <span>Overall progress</span>
-          <span>{items.length > 0 ? Math.round((done / items.length) * 100) : 0}%</span>
+      <div style={{ marginBottom: 22 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--tf)", marginBottom: 5, fontWeight: 600 }}>
+          <span>Overall progress</span><span>{items.length > 0 ? Math.round((done / items.length) * 100) : 0}%</span>
         </div>
-        <div className="h-1.5 bg-navy-700 rounded-full overflow-hidden">
-          <div className="h-full bg-teal rounded-full transition-all duration-700" style={{ width: `${items.length > 0 ? (done / items.length) * 100 : 0}%` }} />
+        <div style={{ height: 2, background: "var(--b)", borderRadius: 2, overflow: "hidden" }}>
+          <div style={{ height: "100%", width: `${items.length > 0 ? (done / items.length) * 100 : 0}%`, background: "var(--accent)", borderRadius: 2, transition: "width 0.6s ease" }} />
         </div>
       </div>
 
       {view === "calendar" ? (
-        <CalendarView items={items} onEdit={(item) => setModal({ mode: "edit", data: item })} />
+        <CalendarView items={items} onEdit={item => setModal({ mode: "edit", data: item })} />
       ) : (
         <>
-          {/* Filters */}
-          <div className="flex gap-3 mb-8 flex-wrap">
-            <select value={filterOwner} onChange={(e) => setFilterOwner(e.target.value)} className="bg-navy-800 border border-navy-700 text-gray-300 text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:border-teal cursor-pointer">
+          <div style={{ display: "flex", gap: 8, marginBottom: 26, flexWrap: "wrap" }}>
+            <select value={filterOwner} onChange={e => setFilterOwner(e.target.value)} className="iola-input" style={{ width: "auto", fontSize: 12, padding: "6px 10px" }}>
               <option value="All">All owners</option>
-              {OWNERS.map((o) => <option key={o}>{o}</option>)}
+              {OWNERS.map(o => <option key={o}>{o}</option>)}
             </select>
-            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="bg-navy-800 border border-navy-700 text-gray-300 text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:border-teal cursor-pointer">
+            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="iola-input" style={{ width: "auto", fontSize: 12, padding: "6px 10px" }}>
               <option value="All">All statuses</option>
-              {STATUSES.map((s) => <option key={s}>{s}</option>)}
+              {STATUSES.map(s => <option key={s}>{s}</option>)}
             </select>
             {(filterOwner !== "All" || filterStatus !== "All") && (
-              <button onClick={() => { setFilterOwner("All"); setFilterStatus("All"); }} className="text-xs text-gray-500 hover:text-white transition-colors px-1">Clear</button>
+              <button className="iola-btn iola-btn-ghost" style={{ fontSize: 12, padding: "5px 10px" }} onClick={() => { setFilterOwner("All"); setFilterStatus("All"); }}>Clear</button>
             )}
           </div>
 
-          {isLoading ? (
-            <div className="text-gray-500 text-sm">Loading…</div>
-          ) : (
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
+          {isLoading ? <p style={{ color: "var(--tf)", fontSize: 13 }}>Loading…</p> : (
+            <DndContext sensors={sensors} collisionDetection={closestCenter}
               onDragStart={({ active }) => setActiveId(active.id)}
-              onDragEnd={handleDragEnd}
-              onDragCancel={() => setActiveId(null)}
-            >
-              <div className="space-y-10">
+              onDragEnd={handleDragEnd} onDragCancel={() => setActiveId(null)}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 30 }}>
                 {ungrouped.length > 0 && (
-                  <Group
-                    label="Ungrouped"
-                    items={ungrouped}
+                  <Group label="Ungrouped" items={ungrouped}
                     onAddTask={() => openAddWithGroup("")}
-                    onEdit={(item) => setModal({ mode: "edit", data: item })}
-                    onDelete={(item) => { if (window.confirm("Delete this task?")) remove.mutate(item); }}
-                    onCycle={(item) => cycleStatus.mutate(item)}
-                  />
+                    onEdit={item => setModal({ mode: "edit", data: item })}
+                    onDelete={item => { if (window.confirm("Delete this task?")) remove.mutate(item); }}
+                    onCycle={item => cycleStatus.mutate(item)} />
                 )}
-                {allGroups.map((group) => {
+                {allGroups.map(group => {
                   const groupItems = byGroup[group] ?? [];
-                  const totalInGroup = items.filter((i) => i.week_label === group).length;
+                  const totalInGroup = items.filter(i => i.week_label === group).length;
                   if (totalInGroup === 0) return null;
                   return (
-                    <Group
-                      key={group}
-                      label={group}
-                      items={groupItems}
-                      totalCount={totalInGroup}
+                    <Group key={group} label={group} items={groupItems} totalCount={totalInGroup}
                       onAddTask={() => openAddWithGroup(group)}
-                      onEdit={(item) => setModal({ mode: "edit", data: item })}
-                      onDelete={(item) => { if (window.confirm("Delete this task?")) remove.mutate(item); }}
-                      onCycle={(item) => cycleStatus.mutate(item)}
-                    />
+                      onEdit={item => setModal({ mode: "edit", data: item })}
+                      onDelete={item => { if (window.confirm("Delete this task?")) remove.mutate(item); }}
+                      onCycle={item => cycleStatus.mutate(item)} />
                   );
                 })}
                 {items.length === 0 && (
-                  <div className="text-center py-16">
-                    <div className="text-4xl mb-3 opacity-20">◆</div>
-                    <p className="text-gray-500 text-sm">No tasks yet.</p>
-                    <button onClick={() => openAddWithGroup("")} className="mt-4 px-4 py-2 bg-teal text-white text-sm font-bold rounded-lg hover:bg-teal-light">Add your first task</button>
+                  <div style={{ textAlign: "center", padding: "72px 24px" }}>
+                    <div style={{ fontSize: 26, marginBottom: 10, opacity: 0.08 }}>◆</div>
+                    <p style={{ color: "var(--tm)", fontSize: 13 }}>No tasks yet.</p>
+                    <button className="iola-btn iola-btn-primary" style={{ marginTop: 16 }} onClick={() => openAddWithGroup("")}>Add your first task</button>
                   </div>
                 )}
               </div>
-
-              {/* Drag overlay — shows the card being dragged */}
               <DragOverlay>
                 {activeItem && (
-                  <div className="rotate-1 shadow-2xl">
+                  <div style={{ transform: "rotate(1deg)", boxShadow: "0 20px 60px rgba(0,0,0,0.55)" }}>
                     <TaskCard item={activeItem} onEdit={() => {}} onDelete={() => {}} onCycle={() => {}} />
                   </div>
                 )}
@@ -690,22 +573,13 @@ export default function ActionItems() {
       )}
 
       {newGroupPrompt && (
-        <NewGroupPrompt
-          existingGroups={allGroups}
-          onConfirm={(name) => { setNewGroupPrompt(false); openAddWithGroup(name); }}
-          onClose={() => setNewGroupPrompt(false)}
-        />
+        <NewGroupPrompt existingGroups={allGroups}
+          onConfirm={name => { setNewGroupPrompt(false); openAddWithGroup(name); }}
+          onClose={() => setNewGroupPrompt(false)} />
       )}
 
       <Modal open={!!modal} onClose={() => setModal(null)} title={modal?.mode === "edit" ? "Edit Task" : "Add Task"}>
-        {modal && (
-          <TaskForm
-            initial={modal.data}
-            existingGroups={allGroups}
-            onSave={(form) => upsert.mutate(form)}
-            onClose={() => setModal(null)}
-          />
-        )}
+        {modal && <TaskForm initial={modal.data} existingGroups={allGroups} onSave={form => upsert.mutate(form)} onClose={() => setModal(null)} />}
       </Modal>
     </div>
   );

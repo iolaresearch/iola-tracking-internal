@@ -82,116 +82,112 @@ export default function AIAssistant() {
 
   return (
     <>
-      {/* Floating button */}
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className="fixed bottom-6 right-6 z-40 bg-teal rounded-full shadow-lg flex items-center justify-center text-white hover:bg-teal-light transition-all hover:scale-105 active:scale-95"
-        style={{ width: 52, height: 52 }}
-        title="IOLA AI Assistant"
-      >
-        <span className="text-xl">{open ? "✕" : "✦"}</span>
+      {/* FAB */}
+      <button onClick={() => setOpen(o => !o)} style={{
+        position: "fixed", bottom: 24, right: 24, zIndex: 60,
+        width: 46, height: 46, borderRadius: "50%",
+        background: "var(--accent)", border: "none", cursor: "pointer",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        color: "#021A17", fontSize: 16, fontWeight: 800,
+        boxShadow: "0 4px 20px rgba(14,205,183,0.35)", transition: "transform 0.15s, box-shadow 0.15s",
+      }}
+      onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.09)"; e.currentTarget.style.boxShadow = "0 6px 28px rgba(14,205,183,0.45)"; }}
+      onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = "0 4px 20px rgba(14,205,183,0.35)"; }}
+      title="IOLA AI">
+        {open ? "×" : (
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="1,11 5,11 7,5 9,17 11,8 13,14 15,11 21,11" stroke="currentColor" strokeWidth="1.7" fill="none"/>
+          </svg>
+        )}
       </button>
 
       {/* Chat panel */}
       {open && (
-        <div
-          className="fixed bottom-20 right-6 z-40 bg-navy-800 border border-navy-700 rounded-2xl shadow-2xl flex flex-col overflow-hidden"
-          style={{ width: 360, height: 500 }}
-        >
+        <div style={{
+          position: "fixed", bottom: 82, right: 24, zIndex: 60,
+          width: 332, height: 440,
+          background: "var(--s2)", border: "1px solid var(--b2)",
+          borderRadius: 14, display: "flex", flexDirection: "column",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.55)", animation: "slideUp 0.18s ease",
+        }}>
           {/* Header */}
-          <div className="px-4 py-3 border-b border-navy-700 flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-teal/10 border border-teal/30 flex items-center justify-center">
-              <span className="text-teal text-sm">✦</span>
+          <div style={{ padding: "13px 16px 11px", borderBottom: "1px solid var(--b)", display: "flex", alignItems: "center", gap: 9 }}>
+            <div style={{ width: 26, height: 26, borderRadius: 7, background: "var(--a-dim)", border: "1px solid var(--a-border)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="var(--accent)" strokeWidth="1.8" strokeLinecap="round">
+                <circle cx="10" cy="10" r="2.2" fill="var(--accent)" stroke="none"/>
+                <ellipse cx="10" cy="10" rx="8" ry="3.5" strokeOpacity="0.9"/>
+                <ellipse cx="10" cy="10" rx="8" ry="3.5" transform="rotate(60 10 10)" strokeOpacity="0.65"/>
+                <ellipse cx="10" cy="10" rx="8" ry="3.5" transform="rotate(120 10 10)" strokeOpacity="0.45"/>
+              </svg>
             </div>
-            <div className="flex-1">
-              <div className="text-white text-sm font-bold leading-tight">IOLA AI</div>
-              <div className="text-gray-500 text-xs">Powered by Claude</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "var(--t)", lineHeight: 1 }}>IOLA AI</div>
+              <div style={{ fontSize: 10, color: "var(--tff)", marginTop: 2 }}>Powered by Claude</div>
             </div>
             {messages.length > 0 && (
-              <button
-                onClick={() => setMessages([])}
-                className="text-gray-600 hover:text-gray-400 text-xs transition-colors"
-                title="Clear chat"
-              >
-                Clear
-              </button>
+              <button onClick={() => setMessages([])} style={{ background: "none", border: "none", color: "var(--tff)", cursor: "pointer", fontSize: 11, fontFamily: "var(--font)" }}>Clear</button>
             )}
           </div>
 
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+          <div style={{ flex: 1, overflowY: "auto", padding: "12px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
             {messages.length === 0 && (
-              <div className="space-y-3">
-                <p className="text-gray-500 text-xs leading-relaxed">
-                  Tell me what to do. I can add, edit, or delete applications, contacts, and tasks — or just answer questions.
+              <div>
+                <p style={{ fontSize: 12, color: "var(--tm)", lineHeight: 1.65, marginBottom: 12 }}>
+                  Ask me about deadlines, tasks, contacts, or the pipeline. I can also add, update, and delete records.
                 </p>
-                <div className="space-y-1.5">
-                  {SUGGESTIONS.map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => send(s)}
-                      className="w-full text-left text-xs text-gray-400 hover:text-teal bg-navy/50 hover:bg-teal/5 border border-navy-700 hover:border-teal/30 rounded-lg px-3 py-2 transition-colors"
-                    >
+                <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                  {SUGGESTIONS.map(s => (
+                    <button key={s} onClick={() => send(s)} style={{
+                      background: "rgba(255,255,255,0.025)", border: "1px solid var(--b)",
+                      borderRadius: 7, padding: "7px 10px", textAlign: "left",
+                      color: "var(--tm)", fontSize: 11, cursor: "pointer",
+                      fontFamily: "var(--font)", transition: "all 0.12s",
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--a-border)"; e.currentTarget.style.color = "var(--accent)"; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--b)"; e.currentTarget.style.color = "var(--tm)"; }}>
                       {s}
                     </button>
                   ))}
                 </div>
               </div>
             )}
-
             {messages.map((m, i) => (
-              <div
-                key={i}
-                className={`text-sm leading-relaxed ${m.role === "user" ? "flex justify-end" : "flex justify-start"}`}
-              >
+              <div key={i} style={{ display: "flex", justifyContent: m.role === "user" ? "flex-end" : "flex-start" }}>
                 {m.role === "user" ? (
-                  <span className="bg-teal/20 text-teal px-3 py-2 rounded-xl rounded-tr-sm inline-block max-w-[85%] text-left text-xs">
-                    {m.text}
-                  </span>
+                  <div style={{ maxWidth: "85%", fontSize: 12, lineHeight: 1.65, padding: "8px 11px", borderRadius: 9, background: "var(--a-dim)", color: "var(--accent)", border: "1px solid var(--a-border)" }}>{m.text}</div>
                 ) : m.role === "system" ? (
-                  <div className="space-y-0.5">
+                  <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                     {m.text.split("\n").map((line, j) => (
-                      <div key={j} className="text-green-400 text-xs bg-green-900/20 px-3 py-1.5 rounded-lg">{line}</div>
+                      <div key={j} style={{ fontSize: 11, color: "#4ADE80", background: "rgba(74,222,128,0.08)", padding: "5px 9px", borderRadius: 7 }}>{line}</div>
                     ))}
                   </div>
                 ) : (
-                  <span className="text-gray-300 whitespace-pre-wrap max-w-full text-xs">{m.text}</span>
+                  <div style={{ maxWidth: "100%", fontSize: 12, lineHeight: 1.65, padding: "8px 11px", borderRadius: 9, background: "rgba(255,255,255,0.04)", color: "var(--tm)", border: "1px solid var(--b)", whiteSpace: "pre-wrap" }}>{m.text}</div>
                 )}
               </div>
             ))}
-
             {loading && (
-              <div className="flex items-center gap-2 text-gray-500 text-xs">
-                <div className="flex gap-1">
-                  <span className="w-1.5 h-1.5 bg-teal rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                  <span className="w-1.5 h-1.5 bg-teal rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                  <span className="w-1.5 h-1.5 bg-teal rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-                </div>
-                Working…
+              <div style={{ display: "flex", gap: 4, padding: "4px 2px" }}>
+                {[0,150,300].map(d => (
+                  <div key={d} style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--accent)", animation: `bounce 1.1s ${d}ms infinite` }} />
+                ))}
               </div>
             )}
             <div ref={bottomRef} />
           </div>
 
           {/* Input */}
-          <div className="px-3 py-3 border-t border-navy-700 flex gap-2">
+          <div style={{ padding: "10px 12px", borderTop: "1px solid var(--b)", display: "flex", gap: 7 }}>
             <input
               ref={inputRef}
               value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
-              }}
-              placeholder="Add, update, delete, or ask…"
-              className="flex-1 bg-navy border border-navy-700 text-white text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-teal placeholder-gray-600 transition-colors"
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
+              placeholder="Ask or instruct…"
+              className="iola-input" style={{ flex: 1, fontSize: 12, padding: "7px 10px" }}
             />
-            <button
-              onClick={() => send()}
-              disabled={loading || !input.trim()}
-              className="px-3 py-2 bg-teal text-white text-sm rounded-lg hover:bg-teal-light disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            >
-              →
-            </button>
+            <button className="iola-btn iola-btn-primary" onClick={() => send()} disabled={loading || !input.trim()} style={{ padding: "7px 12px", fontSize: 14 }}>→</button>
           </div>
         </div>
       )}

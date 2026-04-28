@@ -1,25 +1,22 @@
-const MAP = {
-  Applied:         { bg: "bg-blue-900/40",   text: "text-blue-300",   dot: "bg-blue-400" },
-  "In Progress":   { bg: "bg-amber-900/40",  text: "text-amber-300",  dot: "bg-amber-400" },
-  Accepted:        { bg: "bg-green-900/40",  text: "text-green-300",  dot: "bg-green-400" },
-  Rejected:        { bg: "bg-red-900/40",    text: "text-red-300",    dot: "bg-red-400" },
-  Pending:         { bg: "bg-purple-900/40", text: "text-purple-300", dot: "bg-purple-400" },
-  "Not Yet Applied": { bg: "bg-gray-800",    text: "text-gray-400",   dot: "bg-gray-500" },
-  Active:  { bg: "bg-teal/10",       text: "text-teal",        dot: "bg-teal" },
-  Warm:    { bg: "bg-amber-900/40",  text: "text-amber-300",   dot: "bg-amber-400" },
-  Cold:    { bg: "bg-gray-800",      text: "text-gray-400",    dot: "bg-gray-500" },
-  Done:    { bg: "bg-green-900/40",  text: "text-green-300",   dot: "bg-green-400" },
-  "To Do": { bg: "bg-gray-800",      text: "text-gray-400",    dot: "bg-gray-500" },
+const STATUS_STYLE = {
+  "Not Yet Applied": { bg: "rgba(232,238,244,0.06)", c: "rgba(232,238,244,0.38)" },
+  "In Progress":     { bg: "rgba(245,166,35,0.12)",  c: "#F5A623" },
+  "Applied":         { bg: "rgba(96,165,250,0.12)",  c: "#60A5FA" },
+  "Accepted":        { bg: "rgba(74,222,128,0.12)",  c: "#4ADE80" },
+  "Rejected":        { bg: "rgba(248,113,113,0.12)", c: "#F87171" },
+  "Pending":         { bg: "rgba(192,132,252,0.12)", c: "#C084FC" },
+  "Active":          { bg: "rgba(14,205,183,0.12)",  c: "#0ECDB7" },
+  "Warm":            { bg: "rgba(245,166,35,0.1)",   c: "#F5A623" },
+  "Cold":            { bg: "rgba(232,238,244,0.05)", c: "rgba(232,238,244,0.3)" },
+  "Done":            { bg: "rgba(74,222,128,0.1)",   c: "#4ADE80" },
+  "To Do":           { bg: "rgba(232,238,244,0.06)", c: "rgba(232,238,244,0.38)" },
 };
 
+export { STATUS_STYLE };
+
 export default function StatusBadge({ status }) {
-  const s = MAP[status] ?? MAP["Pending"];
+  const s = STATUS_STYLE[status] ?? STATUS_STYLE["Not Yet Applied"];
   return (
-    <span
-      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${s.bg} ${s.text}`}
-    >
-      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${s.dot}`} />
-      {status}
-    </span>
+    <span className="iola-pill" style={{ background: s.bg, color: s.c }}>{status}</span>
   );
 }

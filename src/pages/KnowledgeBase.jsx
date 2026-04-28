@@ -4,130 +4,85 @@ import { supabase } from "../lib/supabase";
 import { useActivity } from "../hooks/useActivity";
 import Modal from "../components/Modal";
 
-const CATEGORIES = ["General", "Contact", "Context", "Rule", "Fundraising", "Engineering", "Research"];
-
-const CATEGORY_STYLE = {
-  Contact:     "bg-teal/10 text-teal border-teal/30",
-  Context:     "bg-blue-900/40 text-blue-300 border-blue-800",
-  Rule:        "bg-red-900/30 text-red-300 border-red-900/50",
-  Fundraising: "bg-amber-900/40 text-amber-300 border-amber-900/50",
-  Engineering: "bg-indigo-900/40 text-indigo-300 border-indigo-900/50",
-  Research:    "bg-purple-900/40 text-purple-300 border-purple-900/50",
-  General:     "bg-gray-800 text-gray-400 border-gray-700",
+const CATEGORIES = ["General","Contact","Context","Rule","Fundraising","Engineering","Research"];
+const KB_STYLE = {
+  General:     { bg: "rgba(232,238,244,0.06)", c: "rgba(232,238,244,0.38)" },
+  Contact:     { bg: "rgba(14,205,183,0.1)",   c: "#0ECDB7" },
+  Context:     { bg: "rgba(96,165,250,0.1)",   c: "#60A5FA" },
+  Rule:        { bg: "rgba(248,113,113,0.1)",  c: "#F87171" },
+  Fundraising: { bg: "rgba(245,166,35,0.1)",   c: "#F5A623" },
+  Engineering: { bg: "rgba(192,132,252,0.1)",  c: "#C084FC" },
+  Research:    { bg: "rgba(192,132,252,0.1)",  c: "#C084FC" },
 };
+const EMPTY = { title:"", body:"", category:"General" };
 
-const inputCls =
-  "w-full bg-navy border border-navy-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-teal transition-colors placeholder-gray-600";
-
-const EMPTY = { title: "", body: "", category: "General" };
-
-function Field({ label, children }) {
+function Field({ label, children, full }) {
   return (
-    <div>
-      <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
-        {label}
-      </label>
+    <div style={{ gridColumn: full ? "1 / -1" : "span 1" }}>
+      <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: "var(--tf)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 5 }}>{label}</label>
       {children}
     </div>
   );
 }
 
 function NoteForm({ initial, onSave, onClose }) {
-  const [form, setForm] = useState(initial);
-  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-
+  const [f, setF] = useState(initial);
+  const set = (k, v) => setF(p => ({ ...p, [k]: v }));
   return (
-    <>
-      <div className="space-y-4">
-        <Field label="Title">
-          <input
-            value={form.title}
-            onChange={(e) => set("title", e.target.value)}
-            className={inputCls}
-            placeholder="Short, descriptive name"
-            autoFocus
-          />
-        </Field>
-        <Field label="Category">
-          <select value={form.category} onChange={(e) => set("category", e.target.value)} className={inputCls}>
-            {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
-          </select>
-        </Field>
-        <Field label="Content">
-          <textarea
-            value={form.body}
-            onChange={(e) => set("body", e.target.value)}
-            rows={8}
-            className={inputCls + " resize-y font-mono text-xs leading-relaxed"}
-            placeholder={"Write anything the team and AI should know.\n\nExamples:\n- Contact details and relationship notes\n- Rules about how we handle something\n- Context behind a decision\n- Things that should never be forgotten"}
-          />
-        </Field>
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+      <Field label="Title"><input value={f.title} onChange={e => set("title", e.target.value)} className="iola-input" autoFocus placeholder="Short, searchable name" /></Field>
+      <Field label="Category">
+        <select value={f.category} onChange={e => set("category", e.target.value)} className="iola-input">
+          {CATEGORIES.map(c => <option key={c}>{c}</option>)}
+        </select>
+      </Field>
+      <Field label="Content" full>
+        <textarea value={f.body} onChange={e => set("body", e.target.value)} rows={8} className="iola-input"
+                  style={{ resize: "vertical", fontFamily: "monospace", fontSize: 12, lineHeight: 1.7 }}
+                  placeholder={"Write anything the team and AI should know.\n\nExamples:\n— Contact details and relationship notes\n— Rules about how we handle something\n— Context behind a decision"} />
+      </Field>
+      <div style={{ gridColumn: "1/-1", display: "flex", justifyContent: "flex-end", gap: 8 }}>
+        <button className="iola-btn iola-btn-ghost" onClick={onClose}>Cancel</button>
+        <button className="iola-btn iola-btn-primary" onClick={() => onSave(f)} disabled={!f.title.trim() || !f.body.trim()}>Save</button>
       </div>
-      <div className="flex justify-end gap-3 mt-6">
-        <button onClick={onClose} className="px-4 py-2 text-sm text-gray-400 hover:text-white border border-navy-700 rounded-lg transition-colors">
-          Cancel
-        </button>
-        <button
-          onClick={() => onSave(form)}
-          disabled={!form.title.trim() || !form.body.trim()}
-          className="px-5 py-2 text-sm font-bold bg-teal text-white rounded-lg hover:bg-teal-light transition-colors disabled:opacity-40"
-        >
-          Save
-        </button>
-      </div>
-    </>
+    </div>
   );
 }
 
-function NoteCard({ note, onEdit, onDelete }) {
+function NoteCard({ note, onEdit, onDel }) {
   const [expanded, setExpanded] = useState(false);
-  const style = CATEGORY_STYLE[note.category] ?? CATEGORY_STYLE.General;
+  const s = KB_STYLE[note.category] || KB_STYLE.General;
   const lines = note.body.split("\n");
   const preview = lines.slice(0, 3).join("\n");
   const hasMore = lines.length > 3;
 
   return (
-    <div className="bg-navy-800 border border-navy-700 rounded-xl p-5 hover:border-navy-600 transition-colors">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap mb-2">
-            <span className={`px-2 py-0.5 rounded-full text-xs font-bold border ${style}`}>
-              {note.category}
-            </span>
-            <span className="text-gray-600 text-xs">
+    <div style={{ background: "var(--s1)", border: "1px solid var(--b)", borderRadius: 10, padding: "15px 18px", transition: "border-color 0.13s" }}
+         onMouseEnter={e => e.currentTarget.style.borderColor = "var(--b2)"}
+         onMouseLeave={e => e.currentTarget.style.borderColor = "var(--b)"}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 7 }}>
+            <span className="iola-pill" style={{ background: s.bg, color: s.c, fontSize: 10, fontWeight: 700 }}>{note.category}</span>
+            <span style={{ fontSize: 11, color: "var(--tff)" }}>
               {new Date(note.updated_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
               {note.created_by ? ` · ${note.created_by}` : ""}
             </span>
           </div>
-          <h3 className="text-white font-semibold text-sm">{note.title}</h3>
+          <h3 style={{ fontSize: 13, fontWeight: 700, color: "var(--t)" }}>{note.title}</h3>
         </div>
-        <div className="flex gap-1 shrink-0">
-          <button
-            onClick={() => onEdit(note)}
-            className="px-2 py-1 text-xs border border-navy-700 rounded-md text-gray-400 hover:text-white hover:border-gray-500 transition-colors"
-          >
-            Edit
-          </button>
-          <button
-            onClick={() => onDelete(note)}
-            className="px-2 py-1 text-xs border border-red-900/50 rounded-md text-red-400 hover:bg-red-900/20 transition-colors"
-          >
-            Del
-          </button>
+        <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+          <button className="iola-btn iola-btn-ghost" style={{ padding: "3px 8px", fontSize: 11 }} onClick={onEdit}>Edit</button>
+          <button className="iola-btn iola-btn-danger" style={{ padding: "3px 8px", fontSize: 11 }} onClick={onDel}>Del</button>
         </div>
       </div>
-
-      <div className="mt-3">
-        <pre className="text-gray-400 text-xs leading-relaxed whitespace-pre-wrap font-sans">
-          {expanded ? note.body : preview}
-          {!expanded && hasMore && "…"}
+      <div style={{ marginTop: 10 }}>
+        <pre style={{ fontFamily: "var(--font)", fontSize: 12, color: "var(--tm)", lineHeight: 1.7, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+          {expanded ? note.body : preview}{!expanded && hasMore ? "…" : ""}
         </pre>
         {hasMore && (
-          <button
-            onClick={() => setExpanded((e) => !e)}
-            className="text-xs text-teal/70 hover:text-teal mt-1.5 transition-colors"
-          >
-            {expanded ? "Show less" : `Show ${lines.length - 3} more lines`}
+          <button onClick={() => setExpanded(e => !e)} style={{ fontSize: 11, color: "var(--accent)", background: "none", border: "none", cursor: "pointer", marginTop: 5, padding: 0, fontFamily: "var(--font)", opacity: 0.75 }}>
+            {expanded ? "Show less" : `+${lines.length - 3} more lines`}
           </button>
         )}
       </div>
@@ -138,14 +93,13 @@ function NoteCard({ note, onEdit, onDelete }) {
 export default function KnowledgeBase() {
   const qc = useQueryClient();
   const { log } = useActivity();
-  const [modal, setModal] = useState(null);
-  const [filterCategory, setFilterCategory] = useState("All");
+  const [fCat, setFCat]     = useState("All");
   const [search, setSearch] = useState("");
+  const [modal, setModal]   = useState(null);
 
   const { data: notes = [], isLoading } = useQuery({
     queryKey: ["team_notes"],
-    queryFn: () =>
-      supabase.from("team_notes").select("*").order("category").order("title").then((r) => r.data ?? []),
+    queryFn: () => supabase.from("team_notes").select("*").order("category").order("title").then(r => r.data ?? []),
   });
 
   const upsert = useMutation({
@@ -171,117 +125,72 @@ export default function KnowledgeBase() {
     onSuccess: () => { qc.invalidateQueries(["team_notes"]); qc.invalidateQueries(["activity_log"]); },
   });
 
-  const filtered = notes.filter((n) => {
-    if (filterCategory !== "All" && n.category !== filterCategory) return false;
-    if (search && !n.title.toLowerCase().includes(search.toLowerCase()) && !n.body.toLowerCase().includes(search.toLowerCase())) return false;
-    return true;
-  });
+  const filtered = notes.filter(n =>
+    (fCat === "All" || n.category === fCat) &&
+    (!search || n.title.toLowerCase().includes(search.toLowerCase()) || n.body.toLowerCase().includes(search.toLowerCase()))
+  );
 
-  const countByCategory = CATEGORIES.reduce((acc, c) => {
-    acc[c] = notes.filter((n) => n.category === c).length;
-    return acc;
-  }, {});
+  const countFor = (cat) => notes.filter(n => n.category === cat).length;
 
   return (
-    <div className="p-8">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+    <div className="fade-in">
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20 }}>
         <div>
-          <h1 className="text-white text-2xl font-extrabold tracking-tight">Knowledge Base</h1>
-          <p className="text-gray-500 text-sm mt-1">
-            Shared team memory — the AI reads all of this on every message
-          </p>
+          <h1 style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-0.03em", color: "var(--t)" }}>Knowledge Base</h1>
+          <p style={{ color: "var(--tm)", fontSize: 13, marginTop: 4, fontWeight: 500 }}>Shared team memory — read by the AI on every message</p>
         </div>
-        <button
-          onClick={() => setModal({ mode: "add", data: EMPTY })}
-          className="px-4 py-2 bg-teal text-white text-sm font-bold rounded-lg hover:bg-teal-light transition-colors"
-        >
-          + Add Note
-        </button>
+        <button className="iola-btn iola-btn-primary" onClick={() => setModal({ mode: "add", data: EMPTY })}>+ Add Note</button>
       </div>
 
       {/* AI memory banner */}
-      <div className="bg-teal/5 border border-teal/20 rounded-xl px-5 py-3 mb-6 flex items-start gap-3">
-        <span className="text-teal text-lg mt-0.5">✦</span>
-        <div>
-          <div className="text-teal text-xs font-bold uppercase tracking-wider mb-0.5">AI Memory</div>
-          <p className="text-gray-400 text-xs leading-relaxed">
-            Everything in this Knowledge Base is injected into the AI assistant on every message.
-            The AI uses it to answer questions correctly and avoid duplicating work — like knowing Roberto is already a contact and who has that relationship.
-            <br />
-            <span className="text-gray-500">Tell the AI to remember something and it will create a note here automatically.</span>
-          </p>
+      <div style={{ background: "rgba(14,205,183,0.04)", border: "1px solid rgba(14,205,183,0.13)", borderRadius: 10, padding: "12px 16px", marginBottom: 20, display: "flex", gap: 11, alignItems: "flex-start" }}>
+        <span style={{ color: "var(--accent)", fontSize: 13, marginTop: 1, flexShrink: 0 }}>✦</span>
+        <p style={{ fontSize: 12, color: "var(--tm)", lineHeight: 1.65 }}>
+          Everything in this Knowledge Base is injected into the AI on every message. Tell the AI to remember something and it creates a note here automatically.
+        </p>
+      </div>
+
+      <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search notes…"
+               className="iola-input" style={{ width: 200, fontSize: 12, padding: "6px 11px" }} />
+        <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+          {["All", ...CATEGORIES].map(c => {
+            const active = fCat === c;
+            const s = KB_STYLE[c];
+            return (
+              <button key={c} onClick={() => setFCat(c)} style={{
+                padding: "5px 10px", borderRadius: 100, fontSize: 11, fontWeight: 600, cursor: "pointer",
+                border: `1px solid ${active && s ? s.c + "45" : "var(--b)"}`,
+                background: active && s ? s.bg : "transparent",
+                color: active && s ? s.c : (active ? "var(--t)" : "var(--tm)"),
+                transition: "all 0.12s", fontFamily: "var(--font)",
+              }}>
+                {c}{c !== "All" && countFor(c) > 0 && <span style={{ marginLeft: 4, opacity: 0.5, fontSize: 10 }}>{countFor(c)}</span>}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* Search + filters */}
-      <div className="flex gap-3 mb-6 flex-wrap items-center">
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search notes…"
-          className="bg-navy-800 border border-navy-700 text-gray-300 text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-teal w-56 placeholder-gray-600"
-        />
-        <div className="flex gap-2 flex-wrap">
-          {["All", ...CATEGORIES].map((c) => (
-            <button
-              key={c}
-              onClick={() => setFilterCategory(c)}
-              className={`px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${
-                filterCategory === c
-                  ? "bg-teal text-white"
-                  : "bg-navy-800 text-gray-400 border border-navy-700 hover:text-white"
-              }`}
-            >
-              {c}
-              {c !== "All" && countByCategory[c] > 0 && (
-                <span className="ml-1 opacity-60">{countByCategory[c]}</span>
-              )}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {isLoading ? (
-        <div className="text-gray-500 text-sm">Loading…</div>
-      ) : filtered.length === 0 ? (
-        <div className="text-center py-16">
-          <div className="text-4xl mb-3 opacity-20">◈</div>
-          <p className="text-gray-500 text-sm">{notes.length === 0 ? "No notes yet." : "No notes match your search."}</p>
-          {notes.length === 0 && (
-            <button
-              onClick={() => setModal({ mode: "add", data: EMPTY })}
-              className="mt-4 px-4 py-2 bg-teal text-white text-sm font-bold rounded-lg hover:bg-teal-light"
-            >
-              Add your first note
-            </button>
+      {isLoading ? <p style={{ color: "var(--tf)", fontSize: 13 }}>Loading…</p> : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {filtered.length === 0 && (
+            <div style={{ textAlign: "center", padding: "72px 24px" }}>
+              <div style={{ fontSize: 26, marginBottom: 10, opacity: 0.08 }}>◯</div>
+              <p style={{ color: "var(--tm)", fontSize: 13 }}>{notes.length === 0 ? "No notes yet." : "No notes match your search."}</p>
+              {notes.length === 0 && <button className="iola-btn iola-btn-primary" style={{ marginTop: 16 }} onClick={() => setModal({ mode: "add", data: EMPTY })}>Add your first note</button>}
+            </div>
           )}
-        </div>
-      ) : (
-        <div className="grid gap-3">
-          {filtered.map((note) => (
-            <NoteCard
-              key={note.id}
-              note={note}
-              onEdit={(n) => setModal({ mode: "edit", data: n })}
-              onDelete={(n) => { if (window.confirm(`Delete "${n.title}"?`)) remove.mutate(n); }}
-            />
+          {filtered.map(note => (
+            <NoteCard key={note.id} note={note}
+              onEdit={() => setModal({ mode: "edit", data: note })}
+              onDel={() => { if (confirm(`Delete "${note.title}"?`)) remove.mutate(note); }} />
           ))}
         </div>
       )}
 
-      <Modal
-        open={!!modal}
-        onClose={() => setModal(null)}
-        title={modal?.mode === "edit" ? "Edit Note" : "Add Note"}
-      >
-        {modal && (
-          <NoteForm
-            initial={modal.data}
-            onSave={(form) => upsert.mutate(form)}
-            onClose={() => setModal(null)}
-          />
-        )}
+      <Modal open={!!modal} onClose={() => setModal(null)} title={modal?.mode === "edit" ? "Edit Note" : "New Note"}>
+        {modal && <NoteForm initial={modal.data} onSave={f => upsert.mutate(f)} onClose={() => setModal(null)} />}
       </Modal>
     </div>
   );

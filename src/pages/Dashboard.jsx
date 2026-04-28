@@ -2,276 +2,223 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
-import PriorityBadge from "../components/PriorityBadge";
-import StatusBadge from "../components/StatusBadge";
+import PriorityBadge, { PRIORITY_COLOR } from "../components/PriorityBadge";
+import StatusBadge, { STATUS_STYLE } from "../components/StatusBadge";
 
 const TEAM = [
-  { name: "Jason Quist",      role: "Co-Founder & CEO",       initials: "JQ", key: "Jason",    ring: "border-teal/40",    avatar: "bg-teal/10 text-teal" },
-  { name: "Gideon Salami",    role: "Co-Founder & CTO",       initials: "GS", key: "Salami",   ring: "border-blue-400/40",  avatar: "bg-blue-900/40 text-blue-300" },
-  { name: "Abigail Boateng",  role: "Head of Research",       initials: "AB", key: "Abigail",  ring: "border-purple-400/40",avatar: "bg-purple-900/40 text-purple-300" },
-  { name: "Ignatius Balayo",  role: "ML Engineer",            initials: "IB", key: "Ignatius", ring: "border-yellow-400/40",avatar: "bg-yellow-900/40 text-yellow-300" },
-  { name: "Alph Doamekpor",   role: "Strategy & Product",     initials: "AD", key: "Alph",     ring: "border-pink-400/40",  avatar: "bg-pink-900/40 text-pink-300" },
+  { name: "Jason Quist",     role: "Co-Founder & CEO",   initials: "JQ", key: "Jason",    color: "#0ECDB7" },
+  { name: "Gideon Salami",   role: "Co-Founder & CTO",   initials: "GS", key: "Salami",   color: "#60A5FA" },
+  { name: "Abigail Boateng", role: "Head of Research",   initials: "AB", key: "Abigail",  color: "#C084FC" },
+  { name: "Ignatius Balayo", role: "ML Engineer",        initials: "IB", key: "Ignatius", color: "#FCD34D" },
+  { name: "Alph Doamekpor",  role: "Strategy & Product", initials: "AD", key: "Alph",     color: "#F472B6" },
 ];
+
+const daysUntil = (d) => d ? Math.ceil((new Date(d) - new Date()) / 86400000) : null;
+const fmtDate = (d) => d ? new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : null;
 
 function timeAgo(dateStr) {
   const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
 }
 
 export default function Dashboard() {
   const [expandedMember, setExpandedMember] = useState(null);
   const today = new Date();
 
-  const { data: apps = [] } = useQuery({
-    queryKey: ["applications"],
-    queryFn: () => supabase.from("applications").select("*").then((r) => r.data ?? []),
-  });
-  const { data: items = [] } = useQuery({
-    queryKey: ["action_items"],
-    queryFn: () => supabase.from("action_items").select("*").then((r) => r.data ?? []),
-  });
-  const { data: contacts = [] } = useQuery({
-    queryKey: ["outreach"],
-    queryFn: () => supabase.from("outreach").select("*").then((r) => r.data ?? []),
-  });
+  const { data: apps = [] }     = useQuery({ queryKey: ["applications"], queryFn: () => supabase.from("applications").select("*").then(r => r.data ?? []) });
+  const { data: items = [] }    = useQuery({ queryKey: ["action_items"],  queryFn: () => supabase.from("action_items").select("*").then(r => r.data ?? []) });
+  const { data: contacts = [] } = useQuery({ queryKey: ["outreach"],      queryFn: () => supabase.from("outreach").select("*").then(r => r.data ?? []) });
   const { data: activity = [] } = useQuery({
     queryKey: ["activity_log"],
-    queryFn: () =>
-      supabase
-        .from("activity_log")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(10)
-        .then((r) => r.data ?? []),
+    queryFn: () => supabase.from("activity_log").select("*").order("created_at", { ascending: false }).limit(10).then(r => r.data ?? []),
   });
 
-  const in14 = new Date(today);
-  in14.setDate(today.getDate() + 14);
+  const APP_STATUSES = ["Not Yet Applied","In Progress","Applied","Accepted","Rejected","Pending"];
+  const pipeline = APP_STATUSES.map(s => ({ s, n: apps.filter(a => a.status === s).length })).filter(x => x.n > 0);
 
-  const upcomingDeadlines = [
-    ...apps
-      .filter((a) => a.deadline && new Date(a.deadline) >= today && new Date(a.deadline) <= in14)
-      .map((a) => ({ id: a.id, name: a.name, deadline: a.deadline, kind: "Application", priority: a.priority })),
-    ...items
-      .filter((i) => i.due_date && new Date(i.due_date) >= today && new Date(i.due_date) <= in14 && i.status !== "Done")
-      .map((i) => ({ id: i.id, name: i.title, deadline: i.due_date, kind: "Task", priority: i.priority })),
-  ].sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
+  const doneCount = items.filter(t => t.status === "Done").length;
+  const taskPct   = items.length > 0 ? Math.round((doneCount / items.length) * 100) : 0;
+
+  const deadlines = [
+    ...apps.filter(a => a.deadline && daysUntil(a.deadline) >= 0 && daysUntil(a.deadline) <= 14 && !["Accepted","Rejected"].includes(a.status))
+           .map(a => ({ name: a.name, days: daysUntil(a.deadline), priority: a.priority, kind: "App" })),
+    ...items.filter(t => t.due_date && daysUntil(t.due_date) >= 0 && daysUntil(t.due_date) <= 14 && t.status !== "Done")
+            .map(t => ({ name: t.title, days: daysUntil(t.due_date), priority: t.priority, kind: "Task" })),
+  ].sort((a, b) => a.days - b.days).slice(0, 8);
+
+  const urgent = deadlines.filter(d => d.days <= 7).slice(0, 6);
 
   const stats = [
-    {
-      label: "Total Applications",
-      value: apps.length,
-      border: "border-l-teal",
-      text: "text-teal",
-      link: "/applications",
-    },
-    {
-      label: "Active / Applied",
-      value: apps.filter((a) => ["In Progress", "Applied"].includes(a.status)).length,
-      border: "border-l-blue-400",
-      text: "text-blue-400",
-      link: "/applications",
-    },
-    {
-      label: "Accepted / Won",
-      value: apps.filter((a) => a.status === "Accepted").length,
-      border: "border-l-green-400",
-      text: "text-green-400",
-      link: "/applications",
-    },
-    {
-      label: "Critical — Not Applied",
-      value: apps.filter((a) => a.priority === "Critical" && a.status === "Not Yet Applied").length,
-      border: "border-l-red-400",
-      text: "text-red-400",
-      link: "/applications",
-    },
+    { n: apps.length, label: "Applications", color: "var(--accent)", to: "/applications" },
+    { n: apps.filter(a => ["In Progress","Applied"].includes(a.status)).length, label: "Active", color: "#60A5FA", to: "/applications" },
+    { n: apps.filter(a => a.status === "Accepted").length, label: "Accepted", color: "#4ADE80", to: "/applications" },
+    { n: apps.filter(a => a.priority === "Critical" && !["Accepted","Rejected"].includes(a.status)).length, label: "Critical", color: "#F87171", to: "/applications" },
   ];
 
-  const getMemberData = (key) => ({
-    tasks: items.filter((i) => i.owner?.toLowerCase().includes(key.toLowerCase())),
-    contacts: contacts.filter((c) => c.owner?.toLowerCase().includes(key.toLowerCase())),
-  });
-
   return (
-    <div className="p-8 space-y-8">
+    <div className="fade-in">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 28 }}>
         <div>
-          <h1 className="text-white text-2xl font-extrabold tracking-tight">Mission Control</h1>
-          <p className="text-gray-500 text-sm mt-1">
-            {today.toLocaleDateString("en-GB", {
-              weekday: "long",
-              day: "numeric",
-              month: "long",
-              year: "numeric",
-            })}
+          <h1 style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-0.035em", lineHeight: 1, color: "var(--t)" }}>Mission Control</h1>
+          <p style={{ color: "var(--tm)", fontSize: 13, marginTop: 5, fontWeight: 500 }}>
+            {today.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
           </p>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--s1)", border: "1px solid var(--b)", borderRadius: 8, padding: "7px 12px" }}>
+          <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#4ADE80", boxShadow: "0 0 8px #4ADE8080" }} />
+          <span style={{ fontSize: 11, fontWeight: 600, color: "var(--tm)" }}>Live</span>
         </div>
       </div>
 
+      {/* Urgent alert */}
+      {urgent.length > 0 && (
+        <div style={{ background: "rgba(248,113,113,0.05)", border: "1px solid rgba(248,113,113,0.14)", borderRadius: 10, padding: "14px 18px", marginBottom: 22 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: "#F87171", textTransform: "uppercase", letterSpacing: "0.09em", marginBottom: 11 }}>
+            {urgent.length} item{urgent.length !== 1 ? "s" : ""} need attention this week
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+            {urgent.map((item, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <PriorityBadge priority={item.priority} dot />
+                <span style={{ fontSize: 13, color: "var(--t)", flex: 1, fontWeight: 500 }}>{item.name}</span>
+                <span style={{ fontSize: 11, color: "var(--tm)", background: "var(--s1)", padding: "2px 7px", borderRadius: 4 }}>{item.kind}</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: item.days === 0 ? "#F87171" : item.days <= 2 ? "#F5A623" : "var(--tm)", minWidth: 50, textAlign: "right" }}>
+                  {item.days === 0 ? "Today" : item.days === 1 ? "Tomorrow" : `${item.days}d`}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((s) => (
-          <Link
-            key={s.label}
-            to={s.link}
-            className={`bg-navy-800 rounded-xl p-5 border-l-4 ${s.border} border border-navy-700 hover:border-navy-600 transition-colors group`}
-          >
-            <div className={`text-3xl font-extrabold ${s.text} group-hover:scale-105 transition-transform inline-block`}>
-              {s.value}
-            </div>
-            <div className="text-gray-400 text-xs mt-1">{s.label}</div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 20 }}>
+        {stats.map(s => (
+          <Link key={s.label} to={s.to} style={{
+            background: "var(--s1)", border: "1px solid var(--b)", borderRadius: 10, padding: "20px 20px 16px",
+            cursor: "pointer", transition: "border-color 0.15s", textDecoration: "none", display: "block",
+          }}
+          onMouseEnter={e => e.currentTarget.style.borderColor = s.color + "40"}
+          onMouseLeave={e => e.currentTarget.style.borderColor = "var(--b)"}>
+            <div style={{ fontSize: 40, fontWeight: 800, color: s.color, letterSpacing: "-0.05em", lineHeight: 1 }}>{s.n}</div>
+            <div style={{ fontSize: 11, color: "var(--tm)", marginTop: 7, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>{s.label}</div>
           </Link>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Upcoming Deadlines */}
-        <div className="lg:col-span-2 bg-navy-800 rounded-xl p-5 border border-navy-700">
-          <h2 className="text-white font-bold text-xs uppercase tracking-widest mb-4">
-            Upcoming Deadlines — Next 14 Days
-          </h2>
-          {upcomingDeadlines.length === 0 ? (
-            <p className="text-gray-500 text-sm">No deadlines in the next 14 days.</p>
-          ) : (
-            <div className="space-y-2">
-              {upcomingDeadlines.map((item) => {
-                const daysLeft = Math.ceil(
-                  (new Date(item.deadline) - today) / 86400000
-                );
-                const urgent = daysLeft <= 7;
-                return (
-                  <div
-                    key={`${item.kind}-${item.id}`}
-                    className={`flex items-center justify-between px-4 py-3 rounded-lg ${
-                      urgent
-                        ? "bg-red-900/20 border border-red-900/40"
-                        : "bg-navy/50 border border-navy-700"
-                    }`}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="text-white text-sm font-semibold truncate">{item.name}</div>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-gray-500 text-xs">{item.kind}</span>
-                        <PriorityBadge priority={item.priority} />
-                      </div>
-                    </div>
-                    <div
-                      className={`text-xs font-bold ml-4 shrink-0 ${
-                        urgent ? "text-red-400" : "text-amber"
-                      }`}
-                    >
-                      {daysLeft === 0
-                        ? "Today"
-                        : daysLeft === 1
-                        ? "Tomorrow"
-                        : `${daysLeft} days`}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Activity Feed */}
-        <div className="bg-navy-800 rounded-xl p-5 border border-navy-700">
-          <h2 className="text-white font-bold text-xs uppercase tracking-widest mb-4">
-            Recent Activity
-          </h2>
-          {activity.length === 0 ? (
-            <p className="text-gray-500 text-sm">No activity yet. Start editing records.</p>
-          ) : (
-            <div className="space-y-3">
-              {activity.map((a) => (
-                <div key={a.id} className="text-xs">
-                  <div>
-                    <span className="text-teal font-semibold">
-                      {a.user_email?.split("@")[0]}
-                    </span>{" "}
-                    <span className="text-gray-400">{a.action}</span>
-                  </div>
-                  {a.entity_name && (
-                    <div className="text-gray-300 font-medium truncate mt-0.5">
-                      {a.entity_name}
-                    </div>
-                  )}
-                  <div className="text-gray-600 mt-0.5">{timeAgo(a.created_at)}</div>
+      {/* Pipeline + Progress */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 220px", gap: 12, marginBottom: 16 }}>
+        <div style={{ background: "var(--s1)", border: "1px solid var(--b)", borderRadius: 10, padding: "16px 18px" }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: "var(--tf)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 13 }}>Application Pipeline</div>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {pipeline.map(p => {
+              const s = STATUS_STYLE[p.s] || STATUS_STYLE["Not Yet Applied"];
+              return (
+                <div key={p.s} style={{ display: "flex", alignItems: "center", gap: 6, background: s.bg, border: `1px solid ${s.c}22`, borderRadius: 8, padding: "6px 12px" }}>
+                  <span style={{ fontSize: 18, fontWeight: 800, color: s.c, letterSpacing: "-0.04em", lineHeight: 1 }}>{p.n}</span>
+                  <span style={{ fontSize: 11, color: s.c, opacity: 0.85, fontWeight: 500 }}>{p.s}</span>
                 </div>
-              ))}
-            </div>
-          )}
+              );
+            })}
+          </div>
+        </div>
+        <div style={{ background: "var(--s1)", border: "1px solid var(--b)", borderRadius: 10, padding: "16px 18px" }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: "var(--tf)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 13 }}>Task Progress</div>
+          <div style={{ fontSize: 34, fontWeight: 800, color: "var(--accent)", letterSpacing: "-0.04em", lineHeight: 1 }}>{taskPct}%</div>
+          <div style={{ marginTop: 12, height: 3, background: "var(--b)", borderRadius: 3, overflow: "hidden" }}>
+            <div style={{ height: "100%", width: `${taskPct}%`, background: "var(--accent)", borderRadius: 3, transition: "width 0.8s ease" }} />
+          </div>
+          <div style={{ fontSize: 11, color: "var(--tm)", marginTop: 7 }}>{doneCount} of {items.length} tasks done</div>
         </div>
       </div>
 
-      {/* Team Cards */}
-      <div>
-        <h2 className="text-white font-bold text-xs uppercase tracking-widest mb-4">Team</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-          {TEAM.map((member) => {
-            const { tasks, contacts: mc } = getMemberData(member.key);
-            const isExpanded = expandedMember === member.name;
-            const pending = tasks.filter((t) => t.status !== "Done");
-
-            return (
-              <div
-                key={member.name}
-                className={`bg-navy-800 border rounded-xl overflow-hidden cursor-pointer transition-all ${
-                  isExpanded
-                    ? `${member.ring} border-2`
-                    : "border-navy-700 hover:border-navy-600"
-                }`}
-                onClick={() => setExpandedMember(isExpanded ? null : member.name)}
-              >
-                <div className="p-4">
-                  <div
-                    className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold mb-3 ${member.avatar}`}
-                  >
-                    {member.initials}
-                  </div>
-                  <div className="text-white font-semibold text-sm leading-tight">{member.name}</div>
-                  <div className="text-gray-500 text-xs mt-0.5">{member.role}</div>
-                  <div className="flex gap-3 mt-3 text-xs text-gray-500">
-                    <span>
-                      <span className="text-white font-bold">{pending.length}</span> open tasks
-                    </span>
-                    <span>
-                      <span className="text-white font-bold">{mc.length}</span> contacts
-                    </span>
-                  </div>
+      {/* Deadlines + Activity */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 12, marginBottom: 20 }}>
+        <div style={{ background: "var(--s1)", border: "1px solid var(--b)", borderRadius: 10, padding: "16px 18px" }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: "var(--tf)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>Upcoming — 14 days</div>
+          {deadlines.length === 0
+            ? <p style={{ color: "var(--tf)", fontSize: 13 }}>No deadlines coming up.</p>
+            : deadlines.map((d, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 11, padding: "8px 0", borderBottom: i < deadlines.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
+                  <PriorityBadge priority={d.priority} dot />
+                  <span style={{ flex: 1, fontSize: 13, color: "var(--t)", fontWeight: 500 }}>{d.name}</span>
+                  <span style={{ fontSize: 10, color: "var(--tf)", background: "var(--s2)", padding: "2px 7px", borderRadius: 4, fontWeight: 600 }}>{d.kind}</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: d.days <= 3 ? "#F87171" : d.days <= 7 ? "#F5A623" : "var(--tm)", minWidth: 44, textAlign: "right" }}>
+                    {d.days === 0 ? "Today" : d.days === 1 ? "Tmrw" : `${d.days}d`}
+                  </span>
                 </div>
-
-                {isExpanded && (
-                  <div className="border-t border-navy-700 px-4 py-3 space-y-2 bg-navy/30">
-                    {pending.length === 0 && (
-                      <p className="text-gray-600 text-xs">All tasks done.</p>
-                    )}
-                    {pending.slice(0, 5).map((t) => (
-                      <div key={t.id} className="text-xs">
-                        <div className="text-gray-300 font-medium leading-snug">{t.title}</div>
-                        <div className="flex gap-1.5 mt-1">
-                          <PriorityBadge priority={t.priority} />
-                          <StatusBadge status={t.status} />
-                        </div>
+              ))
+          }
+        </div>
+        <div style={{ background: "var(--s1)", border: "1px solid var(--b)", borderRadius: 10, padding: "16px 18px" }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: "var(--tf)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 14 }}>Activity</div>
+          {activity.length === 0
+            ? <p style={{ color: "var(--tf)", fontSize: 12 }}>No activity yet.</p>
+            : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 13 }}>
+                {activity.map(a => {
+                  const name = a.user_email?.split("@")[0] ?? "someone";
+                  const m = TEAM.find(t => t.key.toLowerCase() === name.toLowerCase()) || { color: "var(--accent)", initials: name[0]?.toUpperCase() ?? "?" };
+                  return (
+                    <div key={a.id} style={{ display: "flex", gap: 9 }}>
+                      <div style={{ width: 22, height: 22, borderRadius: "50%", background: m.color + "1C", border: `1px solid ${m.color}38`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 7, fontWeight: 700, color: m.color, flexShrink: 0 }}>
+                        {m.initials ?? name[0]?.toUpperCase()}
                       </div>
-                    ))}
-                    {pending.length > 5 && (
-                      <Link
-                        to="/action-items"
-                        className="text-teal text-xs hover:underline"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        +{pending.length - 5} more →
-                      </Link>
-                    )}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 12, lineHeight: 1.4 }}>
+                          <span style={{ color: m.color, fontWeight: 700 }}>{name}</span>
+                          <span style={{ color: "var(--tm)" }}> {a.action}</span>
+                        </div>
+                        {a.entity_name && <div style={{ fontSize: 11, color: "var(--t)", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 500 }}>{a.entity_name}</div>}
+                        <div style={{ fontSize: 10, color: "var(--tff)", marginTop: 2 }}>{timeAgo(a.created_at)}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )
+          }
+        </div>
+      </div>
+
+      {/* Team cards */}
+      <div>
+        <div style={{ fontSize: 10, fontWeight: 700, color: "var(--tf)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Team</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 10 }}>
+          {TEAM.map(m => {
+            const myTasks    = items.filter(t => (t.owners ?? [t.owner]).includes(m.key) && t.status !== "Done");
+            const myContacts = contacts.filter(c => c.owner === m.key);
+            const isExp      = expandedMember === m.name;
+            return (
+              <div key={m.key}
+                style={{ background: "var(--s1)", border: `1px solid ${isExp ? m.color + "50" : "var(--b)"}`, borderRadius: 10, padding: "15px 14px", cursor: "pointer", transition: "border-color 0.15s" }}
+                onClick={() => setExpandedMember(isExp ? null : m.name)}
+                onMouseEnter={e => { if (!isExp) e.currentTarget.style.borderColor = m.color + "40"; }}
+                onMouseLeave={e => { if (!isExp) e.currentTarget.style.borderColor = "var(--b)"; }}>
+                <div style={{ width: 34, height: 34, borderRadius: "50%", background: m.color + "1C", border: `1px solid ${m.color}38`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: m.color }}>
+                  {m.initials}
+                </div>
+                <div style={{ marginTop: 10, fontSize: 13, fontWeight: 700, color: "var(--t)" }}>{m.name.split(" ")[0]}</div>
+                <div style={{ fontSize: 11, color: "var(--tm)", marginTop: 2, lineHeight: 1.3 }}>{m.role}</div>
+                <div style={{ marginTop: 10, display: "flex", gap: 10 }}>
+                  <div style={{ fontSize: 11, color: "var(--tm)" }}><span style={{ color: "var(--t)", fontWeight: 700 }}>{myTasks.length}</span> tasks</div>
+                  <div style={{ fontSize: 11, color: "var(--tm)" }}><span style={{ color: "var(--t)", fontWeight: 700 }}>{myContacts.length}</span> contacts</div>
+                </div>
+                {isExp && myTasks.slice(0, 4).map(t => (
+                  <div key={t.id} style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--b)" }}>
+                    <div style={{ fontSize: 11, color: "var(--t)", fontWeight: 600, lineHeight: 1.3 }}>{t.title}</div>
+                    <div style={{ display: "flex", gap: 5, marginTop: 3 }}>
+                      <PriorityBadge priority={t.priority} dot />
+                      <StatusBadge status={t.status} />
+                    </div>
                   </div>
-                )}
+                ))}
               </div>
             );
           })}

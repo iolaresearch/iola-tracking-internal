@@ -1,16 +1,104 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-body {
-  background-color: #0D1B2A;
-  color: #F9FAFB;
-  font-family: 'Inter', system-ui, sans-serif;
+:root {
+  --bg:       #07090D;
+  --s1:       #0C1117;
+  --s2:       #111820;
+  --s3:       #16212C;
+  --b:        rgba(255,255,255,0.065);
+  --b2:       rgba(255,255,255,0.11);
+  --t:        #E8EEF4;
+  --tm:       rgba(232,238,244,0.44);
+  --tf:       rgba(232,238,244,0.2);
+  --tff:      rgba(232,238,244,0.1);
+  --accent:   #0ECDB7;
+  --a-dim:    rgba(14,205,183,0.08);
+  --a-border: rgba(14,205,183,0.22);
+  --amber:    #F5A623;
+  --red:      #F87171;
+  --green:    #4ADE80;
+  --font:     'Space Grotesk', system-ui, sans-serif;
 }
 
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: #132030; }
-::-webkit-scrollbar-thumb { background: #1E3A4A; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #00897B44; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: var(--bg); color: var(--t); font-family: var(--font); }
+#root { height: 100%; display: flex; }
+* { -webkit-font-smoothing: antialiased; }
+
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.14); }
+
+input, select, textarea, button { font-family: var(--font); }
+
+.iola-input {
+  width: 100%;
+  background: var(--s1);
+  border: 1px solid var(--b);
+  color: var(--t);
+  border-radius: 6px;
+  padding: 8px 11px;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.iola-input::placeholder { color: var(--tff); }
+.iola-input:focus { border-color: rgba(14,205,183,0.4); }
+.iola-input option { background: var(--s2); color: var(--t); }
+textarea.iola-input { line-height: 1.6; }
+
+.iola-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 14px; border-radius: 6px;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  transition: all 0.13s; border: none; outline: none;
+  white-space: nowrap; font-family: var(--font);
+}
+.iola-btn-primary { background: var(--accent); color: #03201D; }
+.iola-btn-primary:hover { background: #1ADCC9; }
+.iola-btn-primary:disabled { opacity: 0.35; cursor: default; }
+.iola-btn-ghost {
+  background: transparent; color: var(--tm);
+  border: 1px solid var(--b);
+}
+.iola-btn-ghost:hover { color: var(--t); border-color: var(--b2); background: rgba(255,255,255,0.03); }
+.iola-btn-danger {
+  background: transparent; color: #F87171;
+  border: 1px solid rgba(248,113,113,0.18);
+}
+.iola-btn-danger:hover { background: rgba(248,113,113,0.07); }
+
+.iola-pill {
+  display: inline-flex; align-items: center;
+  padding: 2px 8px; border-radius: 100px;
+  font-size: 11px; font-weight: 600;
+  letter-spacing: 0.01em; white-space: nowrap;
+}
+
+.row-hover { transition: background 0.1s; }
+.row-hover:hover { background: rgba(255,255,255,0.022) !important; }
+
+.modal-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.72);
+  backdrop-filter: blur(6px);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 200; padding: 24px;
+}
+.modal-box {
+  background: var(--s2);
+  border: 1px solid var(--b2);
+  border-radius: 12px;
+  width: 100%; max-width: 540px;
+  animation: slideUp 0.18s ease;
+}
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(10px) scale(0.99); } to { opacity: 1; transform: none; } }
+@keyframes bounce { 0%,80%,100% { transform: scale(0.6); opacity: 0.4; } 40% { transform: scale(1); opacity: 1; } }
+.fade-in { animation: fadeIn 0.22s ease; }

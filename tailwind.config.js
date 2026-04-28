@@ -4,21 +4,18 @@ export default {
   theme: {
     extend: {
       colors: {
-        navy: {
-          DEFAULT: "#0D1B2A",
-          800: "#132030",
-          700: "#1E3A4A",
-        },
-        teal: {
-          DEFAULT: "#00897B",
-          light: "#4DB6AC",
-        },
-        amber: {
-          DEFAULT: "#F59E0B",
-        },
+        bg:     "#07090D",
+        s1:     "#0C1117",
+        s2:     "#111820",
+        s3:     "#16212C",
+        accent: "#0ECDB7",
+        amber:  "#F5A623",
+        // keep legacy names for any remaining tailwind usage
+        navy: { DEFAULT: "#07090D", 800: "#0C1117", 700: "#16212C" },
+        teal: { DEFAULT: "#0ECDB7", light: "#1ADCC9" },
       },
       fontFamily: {
-        sans: ["Inter", "system-ui", "sans-serif"],
+        sans: ["Space Grotesk", "system-ui", "sans-serif"],
       },
     },
   },

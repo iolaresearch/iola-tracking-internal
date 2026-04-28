@@ -2,30 +2,28 @@ import { useEffect } from "react";
 
 export default function Modal({ open, onClose, title, children }) {
   useEffect(() => {
-    const handler = (e) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    const h = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
   }, [onClose]);
 
   if (!open) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
-      />
-      <div className="relative bg-navy-800 border border-navy-700 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-navy-700">
-          <h2 className="text-white font-bold text-base">{title}</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-white text-2xl leading-none transition-colors"
-          >
-            &times;
-          </button>
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal-box" onClick={e => e.stopPropagation()}>
+        <div style={{
+          padding: "17px 22px 14px", borderBottom: "1px solid var(--b)",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+        }}>
+          <span style={{ fontWeight: 700, fontSize: 14, letterSpacing: "-0.015em", color: "var(--t)" }}>{title}</span>
+          <button onClick={onClose} style={{
+            background: "none", border: "none", color: "var(--tf)",
+            cursor: "pointer", fontSize: 20, lineHeight: 1, padding: "0 3px",
+          }}>×</button>
         </div>
-        <div className="px-6 py-5">{children}</div>
+        <div style={{ padding: "18px 22px 22px", overflowY: "auto", maxHeight: "72vh" }}>
+          {children}
+        </div>
       </div>
     </div>
   );
