@@ -8,6 +8,7 @@ import Applications from "./pages/Applications";
 import Outreach from "./pages/Outreach";
 import ActionItems from "./pages/ActionItems";
 import KnowledgeBase from "./pages/KnowledgeBase";
+import Alerts from "./pages/Alerts";
 
 export default function App() {
   return (
@@ -28,6 +29,7 @@ export default function App() {
           <Route path="outreach" element={<Outreach />} />
           <Route path="action-items" element={<ActionItems />} />
           <Route path="knowledge" element={<KnowledgeBase />} />
+          <Route path="alerts" element={<Alerts />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

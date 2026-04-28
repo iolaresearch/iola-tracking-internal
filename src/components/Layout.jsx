@@ -1,6 +1,10 @@
 import { Outlet, NavLink, useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../hooks/useAuth";
+import { useAlerts } from "../hooks/useAlerts";
+import { useDeadlineAlerts } from "../hooks/useDeadlineAlerts";
+import { useNotifications } from "../hooks/useNotifications";
 import AIAssistant from "./AIAssistant";
 
 const IC = {
@@ -32,6 +36,12 @@ const IC = {
       <path d="M3 1.5h9v12H3z"/><path d="M5.5 5h4M5.5 7.5h4M5.5 10h2.5"/>
     </svg>
   ),
+  alerts: (
+    <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M7.5 1.5a4 4 0 0 1 4 4v2.5l1 2H3l1-2V5.5a4 4 0 0 1 4-4z"/>
+      <path d="M6 11.5a1.5 1.5 0 0 0 3 0"/>
+    </svg>
+  ),
 };
 
 const NAV = [
@@ -40,6 +50,7 @@ const NAV = [
   { to: "/outreach",     label: "Outreach",        icon: IC.outreach },
   { to: "/action-items", label: "Action Items",    icon: IC.tasks },
   { to: "/knowledge",    label: "Knowledge Base",  icon: IC.kb },
+  { to: "/alerts",       label: "Alerts",          icon: IC.alerts },
 ];
 
 const TEAM = [
@@ -53,6 +64,20 @@ const TEAM = [
 export default function Layout() {
   const navigate = useNavigate();
   const { session } = useAuth();
+  const { alerts, unreadCount, createAlert, userEmail } = useAlerts();
+
+  const { data: apps = [] } = useQuery({
+    queryKey: ["applications"],
+    queryFn: () => supabase.from("applications").select("*").then(r => r.data ?? []),
+  });
+  const { data: items = [] } = useQuery({
+    queryKey: ["action_items"],
+    queryFn: () => supabase.from("action_items").select("*").then(r => r.data ?? []),
+  });
+
+  useDeadlineAlerts({ apps, items, userEmail, createAlert });
+  useNotifications(alerts.filter(a => !a.read));
+
   const firstName = session?.user?.email?.split("@")[0] ?? "";
   const initial = firstName[0]?.toUpperCase() ?? "?";
 
@@ -103,6 +128,13 @@ export default function Layout() {
             })}>
               <span style={{ flexShrink: 0, display: "flex", opacity: 0.75 }}>{icon}</span>
               {label}
+              {unreadCount > 0 && to === "/alerts" && (
+                <span style={{
+                  marginLeft: "auto", minWidth: 16, height: 16, borderRadius: 8,
+                  background: "#F87171", color: "white", fontSize: 9, fontWeight: 800,
+                  display: "flex", alignItems: "center", justifyContent: "center", padding: "0 4px",
+                }}>{unreadCount > 9 ? "9+" : unreadCount}</span>
+              )}
             </NavLink>
           ))}
         </nav>
@@ -152,7 +184,7 @@ export default function Layout() {
         <Outlet />
       </main>
 
-      <AIAssistant />
+      <AIAssistant createAlert={createAlert} />
     </div>
   );
 }

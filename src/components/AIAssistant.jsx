@@ -27,7 +27,7 @@ function getResultLink(text) {
   return null;
 }
 
-export default function AIAssistant() {
+export default function AIAssistant({ createAlert }) {
   const navigate = useNavigate();
   const [open, setOpen]         = useState(false);
   const [input, setInput]         = useState("");
@@ -96,6 +96,19 @@ export default function AIAssistant() {
           ...m,
           { role: "system", text: toolResults.map((r) => `✓ ${r}`).join("\n") },
         ]);
+
+        // Save AI action snapshot for undo
+        if (createAlert) {
+          const snapshot = getSnapshot();
+          if (snapshot.length > 0) {
+            await createAlert({
+              type: "ai_action",
+              title: `AI: ${toolResults.length} change${toolResults.length > 1 ? "s" : ""}`,
+              body: toolResults.join(", "),
+              snapshot,
+            });
+          }
+        }
       }
     } catch (err) {
       setMessages((m) => [
