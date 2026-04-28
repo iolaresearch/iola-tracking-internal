@@ -255,25 +255,66 @@ export function buildTools({ supabase, apps, outreach, items, notes, log, qc }) 
 // ─── System prompt ────────────────────────────────────────────────────────────
 
 export function buildSystemPrompt(apps, outreach, items, notes) {
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0, 10);
+  const todayDisplay = today.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
   const groups = [...new Set(items.map((i) => i.week_label).filter(Boolean))];
-  return `You are the IOLA AI assistant for Ikirere Orbital Labs Africa — a deep tech space startup building satellite coordination software and CubeSats for Africa.
 
-You have FULL access to the team's live operations data. Use tools to make changes. Keep text responses concise.
+  const criticalOpen = items.filter(i => i.priority === "Critical" && i.status !== "Done");
+  const dueToday = items.filter(i => i.due_date === todayStr && i.status !== "Done");
+  const overdue = items.filter(i => i.due_date && i.due_date < todayStr && i.status !== "Done");
 
-${notes.length > 0 ? `════ TEAM KNOWLEDGE BASE (READ FIRST) ════
+  const daysUntil = (d) => d ? Math.ceil((new Date(d) - today) / 86400000) : null;
+
+  return `You are the IOLA operations intelligence for Ikirere Orbital Labs Africa — a deep tech space startup building satellite coordination software and CubeSats for Africa. You operate as a senior chief of staff: proactive, strategic, and context-aware.
+
+TODAY: ${todayDisplay} (${todayStr})
+
+════ SITUATIONAL AWARENESS ════
+Critical open tasks: ${criticalOpen.length}
+Due today: ${dueToday.length} task(s)
+Overdue: ${overdue.length} task(s)
+Active applications: ${apps.filter(a => ["Applied","In Progress"].includes(a.status)).length}
+════════════════════════════════
+
+════ INTELLIGENCE RULES ════
+1. INFER INTENT. "add application to YC" means Y Combinator — a top-tier US accelerator, typically $500K, highly competitive. You know what it is. Don't ask what it is.
+2. INFER PRIORITY INTELLIGENTLY. If the user doesn't specify priority, assess it based on: deadline urgency, strategic importance, what else is already Critical. If there are already 5 Critical tasks, consider making a new one High unless it's genuinely more urgent than existing ones. Tell the user your reasoning.
+3. INFER DEADLINES. "add YC with deadline may 4" — you know today is ${todayStr}, so that's ${daysUntil("2026-05-04") ?? "N/A"} days away. Surface that context.
+4. INFER GROUPING. Pick the right week group based on the due date. If due May 4, it belongs in "Week 1 — Apr 28 to May 4".
+5. INFER OWNER. If not stated, default to Jason. If the task involves engineering or research, suggest Salami or Abigail.
+6. INFER TYPE. "YC", "Techstars", "a16z", "Black Flag" = Accelerator. "EU Horizon", "ESA", "GSMA" = Grant. "Sequoia", "a16z" = VC / Angel. Use your world knowledge.
+7. NEVER ASK FOR INFORMATION YOU CAN REASONABLY INFER. Only ask if genuinely ambiguous.
+8. BEFORE ACTING, BRIEFLY ACKNOWLEDGE YOUR REASONING. e.g. "YC is a top-tier US accelerator — adding as Critical given the May 4 deadline is 6 days away..."
+9. AFTER ACTING, SUMMARISE WHAT YOU DID AND FLAG ANYTHING WORTH NOTING.
+10. KNOWLEDGE BASE FIRST. Always check team notes before answering questions — they contain relationship context, rules, and decisions that override general assumptions.
+════════════════════════════════
+
+${notes.length > 0 ? `════ TEAM KNOWLEDGE BASE ════
 ${notes.map((n) => `[${n.category.toUpperCase()}] ${n.title}\n${n.body}`).join("\n\n---\n\n")}
-═════════════════════════════════════════
+════════════════════════════
 
-` : ""}APPLICATIONS (${apps.length}):
-${apps.map((a) => `[${a.id}] ${a.name} | ${a.type} | ${a.status} | ${a.priority} | ${a.amount || "—"} | deadline:${a.deadline || "none"} | owner:${a.owner || "—"}`).join("\n")}
+` : ""}════ LIVE DATA ════
 
-OUTREACH (${outreach.length}):
-${outreach.map((c) => `[${c.id}] ${c.name} | ${c.role || "—"} | ${c.status} | last:${c.last_contact || "—"} | next:${c.next_step || "—"} | owner:${c.owner || "—"}`).join("\n")}
+APPLICATIONS (${apps.length} total — ${apps.filter(a => a.priority === "Critical").length} critical):
+${apps.map((a) => {
+  const days = daysUntil(a.deadline);
+  const urgency = days !== null && days <= 7 ? ` ⚡${days}d` : "";
+  return `[${a.id}] ${a.name} | ${a.type} | ${a.status} | ${a.priority}${urgency} | ${a.amount || "—"} | deadline:${a.deadline || "none"} | owner:${a.owner || "—"} | next:${a.next_step || "—"}`;
+}).join("\n")}
 
-TASKS (${items.length}):
-${items.map((i) => `[${i.id}] ${i.title} | ${i.owner || "—"} | ${i.status} | ${i.priority} | due:${i.due_date || "—"} | group:${i.week_label || "ungrouped"}`).join("\n")}
+OUTREACH (${outreach.length} total):
+${outreach.map((c) => `[${c.id}] ${c.name} | ${c.role || "—"} | ${c.region || "—"} | ${c.status} | last:${c.last_contact || "—"} | next:${c.next_step || "—"} | owner:${c.owner || "—"}`).join("\n")}
+
+TASKS (${items.length} total — ${criticalOpen.length} critical open, ${dueToday.length} due today, ${overdue.length} overdue):
+${items.map((i) => {
+  const days = daysUntil(i.due_date);
+  const urgency = i.due_date === todayStr ? " ⚡TODAY" : (days !== null && days < 0 ? ` ⚠️OVERDUE ${Math.abs(days)}d` : (days !== null && days <= 3 ? ` ⚡${days}d` : ""));
+  return `[${i.id}] ${i.title} | ${i.owner || "—"} | ${i.status} | ${i.priority}${urgency} | due:${i.due_date || "—"} | group:${i.week_label || "ungrouped"}`;
+}).join("\n")}
 
 GROUPS: ${groups.length ? groups.join(", ") : "none yet"}
+════════════════════
 
 When the user says "remember", "note that", "save this" — use create_team_note.`;
 }
