@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { supabase } from "../lib/supabase";
 import { askClaude, buildSystemPrompt, buildTools } from "../lib/claude";
 import { useActivity } from "../hooks/useActivity";
@@ -174,7 +175,7 @@ export default function AIAssistant() {
                 ) : (
                   <div style={{ maxWidth: "100%", fontSize: 12, lineHeight: 1.65, padding: "8px 11px", borderRadius: 9, background: "rgba(255,255,255,0.04)", color: "var(--tm)", border: "1px solid var(--b)" }}
                        className="ai-markdown">
-                    <ReactMarkdown>{m.text}</ReactMarkdown>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.text}</ReactMarkdown>
                   </div>
                 )}
               </div>
