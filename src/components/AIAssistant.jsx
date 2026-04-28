@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { supabase } from "../lib/supabase";
@@ -15,7 +16,19 @@ const SUGGESTIONS = [
   "What is Abigail working on?",
 ];
 
+// Map tool result strings to the page they relate to
+function getResultLink(text) {
+  if (!text) return null;
+  const t = text.toLowerCase();
+  if (t.includes("task") || t.includes("action")) return "/action-items";
+  if (t.includes("application") || t.includes("grant") || t.includes("accelerator")) return "/applications";
+  if (t.includes("contact") || t.includes("outreach")) return "/outreach";
+  if (t.includes("knowledge") || t.includes("note")) return "/knowledge";
+  return null;
+}
+
 export default function AIAssistant() {
+  const navigate = useNavigate();
   const [open, setOpen]         = useState(false);
   const [input, setInput]       = useState("");
   const [messages, setMessages] = useState([]);
@@ -168,9 +181,22 @@ export default function AIAssistant() {
                   <div style={{ maxWidth: "85%", fontSize: 12, lineHeight: 1.65, padding: "8px 11px", borderRadius: 9, background: "var(--a-dim)", color: "var(--accent)", border: "1px solid var(--a-border)" }}>{m.text}</div>
                 ) : m.role === "system" ? (
                   <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                    {m.text.split("\n").map((line, j) => (
-                      <div key={j} style={{ fontSize: 11, color: "#4ADE80", background: "rgba(74,222,128,0.08)", padding: "5px 9px", borderRadius: 7 }}>{line}</div>
-                    ))}
+                    {m.text.split("\n").map((line, j) => {
+                      const link = getResultLink(line);
+                      return (
+                        <div key={j} style={{ fontSize: 11, color: "#4ADE80", background: "rgba(74,222,128,0.08)", padding: "5px 9px", borderRadius: 7, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                          <span>{line}</span>
+                          {link && (
+                            <button onClick={() => { setOpen(false); navigate(link); }} style={{
+                              fontSize: 10, color: "#4ADE80", background: "rgba(74,222,128,0.15)",
+                              border: "1px solid rgba(74,222,128,0.3)", borderRadius: 5,
+                              padding: "2px 7px", cursor: "pointer", fontFamily: "var(--font)",
+                              fontWeight: 600, flexShrink: 0, whiteSpace: "nowrap",
+                            }}>View →</button>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : (
                   <div style={{ maxWidth: "100%", fontSize: 12, lineHeight: 1.65, padding: "8px 11px", borderRadius: 9, background: "rgba(255,255,255,0.04)", color: "var(--tm)", border: "1px solid var(--b)" }}

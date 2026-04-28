@@ -178,7 +178,12 @@ export function buildTools({ supabase, apps, outreach, items, notes, log, qc }) 
       }),
       run: async ({ id, ...fields }) => {
         await supabase.from("action_items").update(fields).eq("id", id);
-        const name = items.find((i) => i.id === id)?.title ?? id;
+        // Look up title: from local cache, from fields if being renamed, or from DB
+        let name = fields.title ?? items.find((i) => i.id === id)?.title;
+        if (!name) {
+          const { data } = await supabase.from("action_items").select("title").eq("id", id).single();
+          name = data?.title ?? id;
+        }
         await log({ action: `AI: updated ${Object.keys(fields).join(", ")}`, entityType: "action_item", entityId: id, entityName: name });
         invalidate(["action_items","activity_log"]);
         return `Updated task: ${name}`;
