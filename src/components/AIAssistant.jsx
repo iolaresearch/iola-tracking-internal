@@ -1,231 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "../lib/supabase";
-import { askGemini } from "../lib/gemini";
+import { askClaude, buildSystemPrompt, buildTools } from "../lib/claude";
 import { useActivity } from "../hooks/useActivity";
-
-// ─── System prompt ───────────────────────────────────────────────────────────
-
-function buildSystemPrompt(apps, outreach, items, notes) {
-  const groups = [...new Set(items.map((i) => i.week_label).filter(Boolean))];
-
-  return `You are the IOLA AI assistant for Ikirere Orbital Labs Africa — a deep tech space startup building satellite coordination software and CubeSats for Africa.
-
-You have FULL access to the team's live operations data. You can read, create, update, and delete any record, exactly like a human using the dashboard.
-
-${notes.length > 0 ? `════════════════════════════════════════
-TEAM KNOWLEDGE BASE — READ THIS FIRST
-════════════════════════════════════════
-This is the shared team memory. Use it to answer questions correctly and avoid errors.
-Never contradict or ignore what is written here.
-
-${notes.map((n) => `[${n.category.toUpperCase()}] ${n.title}
-${n.body}`).join("\n\n---\n\n")}
-
-════════════════════════════════════════` : ""}
-
-════════════════════════════════════════
-CURRENT DATA
-════════════════════════════════════════
-
-APPLICATIONS & GRANTS (${apps.length}):
-${apps.map((a) => `  [${a.id}]
-    name: ${a.name}
-    type: ${a.type} | region: ${a.region || "—"} | amount: ${a.amount || "—"}
-    status: ${a.status} | priority: ${a.priority}
-    deadline: ${a.deadline || "none"} | owner: ${a.owner || "—"}
-    next_step: ${a.next_step || "—"}
-    notes: ${a.notes || "—"}
-    fund_description: ${a.fund_description || "—"}
-    contact_name: ${a.contact_name || "—"}`).join("\n\n")}
-
-OUTREACH CONTACTS (${outreach.length}):
-${outreach.map((c) => `  [${c.id}]
-    name: ${c.name} | role: ${c.role || "—"} | region: ${c.region || "—"}
-    status: ${c.status} | last_contact: ${c.last_contact || "—"} | owner: ${c.owner || "—"}
-    next_step: ${c.next_step || "—"}
-    notes: ${c.notes || "—"}`).join("\n\n")}
-
-ACTION ITEMS (${items.length}):
-${items.map((i) => `  [${i.id}]
-    title: ${i.title}
-    owner: ${i.owner || "—"} | status: ${i.status} | priority: ${i.priority}
-    due_date: ${i.due_date || "—"} | group: ${i.week_label || "ungrouped"}
-    description: ${i.description || "—"}`).join("\n\n")}
-
-EXISTING GROUPS: ${groups.length ? groups.join(", ") : "none yet"}
-
-════════════════════════════════════════
-SCHEMA & VALID VALUES
-════════════════════════════════════════
-
-applications fields:
-  name (text), type (Accelerator|Grant|VC / Angel|Partnership|Academic),
-  region (text), amount (text), fund_description (text),
-  status (Not Yet Applied|Applied|In Progress|Accepted|Rejected|Pending),
-  priority (Critical|High|Medium|Low),
-  next_step (text), notes (text), deadline (YYYY-MM-DD or null),
-  contact_name (text), owner (text)
-
-outreach fields:
-  name (text), role (text), region (text),
-  status (Active|Pending|Warm|Cold|Done),
-  last_contact (YYYY-MM-DD or null), notes (text),
-  next_step (text), owner (text)
-
-action_items fields:
-  title (text), description (text),
-  owner (text — primary owner, keep in sync with first element of owners),
-  owners (text[] — array of assignees, e.g. ["Jason","Abigail"]),
-  due_date (YYYY-MM-DD or null),
-  status (To Do|In Progress|Done),
-  priority (Critical|High|Medium|Low),
-  week_label (text — any free string, used for grouping),
-  sort_order (integer — lower number = higher in list, use to reorder tasks)
-
-Valid owner names: Jason, Salami, Abigail, Ignatius, Alph
-
-team_notes fields:
-  title (text — short, searchable), body (text — full content),
-  category (Contact|Context|Rule|Fundraising|Engineering|Research|General)
-
-════════════════════════════════════════
-ACTION PROTOCOL
-════════════════════════════════════════
-
-At the END of your response, output one JSON action per line (no markdown, no code fences).
-
-CREATE:
-{"action":"create_application","data":{"name":"...","type":"...","status":"...","priority":"..."}}
-{"action":"create_outreach","data":{"name":"...","role":"...","status":"...","owner":"Jason"}}
-{"action":"create_action_item","data":{"title":"...","owner":"...","status":"To Do","priority":"High","week_label":"..."}}
-{"action":"create_team_note","data":{"title":"...","body":"...","category":"Contact"}}
-
-UPDATE (use a data object — include only fields that change):
-{"action":"update_application","id":"<uuid>","data":{"status":"Applied","next_step":"Submit by Friday"}}
-{"action":"update_outreach","id":"<uuid>","data":{"status":"Active","last_contact":"2026-04-26"}}
-{"action":"update_action_item","id":"<uuid>","data":{"status":"Done"}}
-{"action":"update_team_note","id":"<uuid>","data":{"body":"updated content"}}
-
-DELETE:
-{"action":"delete_application","id":"<uuid>","name":"<record name for confirmation>"}
-{"action":"delete_outreach","id":"<uuid>","name":"<contact name>"}
-{"action":"delete_action_item","id":"<uuid>","name":"<task title>"}
-{"action":"delete_team_note","id":"<uuid>","name":"<note title>"}
-
-Rules:
-- Use exact UUIDs from the data above.
-- For creates, include all required fields (name/title, type/status/priority at minimum).
-- For updates, only include the fields that should change.
-- For deletes, always include name so the log is readable.
-- You can output multiple action lines for bulk operations.
-- Only output actions you are confident about. If ambiguous, ask for clarification.
-- Keep your text response concise. Let the actions do the work.
-
-MEMORY RULE: When the user says "remember", "note that", "save this", "don't forget", or shares context the team should retain — create a team_note automatically. Title should be short and searchable. Body should be complete and self-contained. Choose the most appropriate category.`;
-}
-
-// ─── Action executor ─────────────────────────────────────────────────────────
-
-async function executeAction(act, { apps, outreach, items, notes, log, qc }) {
-  const invalidate = (keys) => keys.forEach((k) => qc.invalidateQueries([k]));
-
-  switch (act.action) {
-    // ── Applications ──
-    case "create_application": {
-      const { data } = await supabase.from("applications").insert(act.data).select().single();
-      await log({ action: "AI: created application", entityType: "application", entityId: data.id, entityName: act.data.name });
-      invalidate(["applications", "activity_log"]);
-      return `Created application: ${act.data.name}`;
-    }
-    case "update_application": {
-      await supabase.from("applications").update(act.data).eq("id", act.id);
-      const name = apps.find((a) => a.id === act.id)?.name ?? act.id;
-      const fields = Object.keys(act.data).join(", ");
-      await log({ action: `AI: updated ${fields}`, entityType: "application", entityId: act.id, entityName: name });
-      invalidate(["applications", "activity_log"]);
-      return `Updated ${name}`;
-    }
-    case "delete_application": {
-      await supabase.from("applications").delete().eq("id", act.id);
-      await log({ action: "AI: deleted application", entityType: "application", entityId: act.id, entityName: act.name });
-      invalidate(["applications", "activity_log"]);
-      return `Deleted application: ${act.name}`;
-    }
-
-    // ── Outreach ──
-    case "create_outreach": {
-      const { data } = await supabase.from("outreach").insert(act.data).select().single();
-      await log({ action: "AI: created contact", entityType: "outreach", entityId: data.id, entityName: act.data.name });
-      invalidate(["outreach", "activity_log"]);
-      return `Created contact: ${act.data.name}`;
-    }
-    case "update_outreach": {
-      await supabase.from("outreach").update(act.data).eq("id", act.id);
-      const name = outreach.find((c) => c.id === act.id)?.name ?? act.id;
-      const fields = Object.keys(act.data).join(", ");
-      await log({ action: `AI: updated ${fields}`, entityType: "outreach", entityId: act.id, entityName: name });
-      invalidate(["outreach", "activity_log"]);
-      return `Updated ${name}`;
-    }
-    case "delete_outreach": {
-      await supabase.from("outreach").delete().eq("id", act.id);
-      await log({ action: "AI: deleted contact", entityType: "outreach", entityId: act.id, entityName: act.name });
-      invalidate(["outreach", "activity_log"]);
-      return `Deleted contact: ${act.name}`;
-    }
-
-    // ── Action Items ──
-    case "create_action_item": {
-      const { data } = await supabase.from("action_items").insert(act.data).select().single();
-      await log({ action: "AI: created task", entityType: "action_item", entityId: data.id, entityName: act.data.title });
-      invalidate(["action_items", "activity_log"]);
-      return `Created task: ${act.data.title}`;
-    }
-    case "update_action_item": {
-      await supabase.from("action_items").update(act.data).eq("id", act.id);
-      const name = items.find((i) => i.id === act.id)?.title ?? act.id;
-      const fields = Object.keys(act.data).join(", ");
-      await log({ action: `AI: updated ${fields}`, entityType: "action_item", entityId: act.id, entityName: name });
-      invalidate(["action_items", "activity_log"]);
-      return `Updated task: ${name}`;
-    }
-    case "delete_action_item": {
-      await supabase.from("action_items").delete().eq("id", act.id);
-      await log({ action: "AI: deleted task", entityType: "action_item", entityId: act.id, entityName: act.name });
-      invalidate(["action_items", "activity_log"]);
-      return `Deleted task: ${act.name}`;
-    }
-
-    // ── Team Notes ──
-    case "create_team_note": {
-      const { data: { session } } = await supabase.auth.getSession();
-      const payload = { ...act.data, created_by: session?.user?.email?.split("@")[0] ?? "AI" };
-      const { data } = await supabase.from("team_notes").insert(payload).select().single();
-      await log({ action: "AI: saved to knowledge base", entityType: "team_note", entityId: data.id, entityName: act.data.title });
-      invalidate(["team_notes", "activity_log"]);
-      return `Saved to knowledge base: ${act.data.title}`;
-    }
-    case "update_team_note": {
-      await supabase.from("team_notes").update(act.data).eq("id", act.id);
-      const name = notes.find((n) => n.id === act.id)?.title ?? act.id;
-      await log({ action: "AI: updated knowledge note", entityType: "team_note", entityId: act.id, entityName: name });
-      invalidate(["team_notes", "activity_log"]);
-      return `Updated knowledge note: ${name}`;
-    }
-    case "delete_team_note": {
-      await supabase.from("team_notes").delete().eq("id", act.id);
-      await log({ action: "AI: deleted knowledge note", entityType: "team_note", entityId: act.id, entityName: act.name });
-      invalidate(["team_notes", "activity_log"]);
-      return `Deleted knowledge note: ${act.name}`;
-    }
-
-    default:
-      return null;
-  }
-}
-
-// ─── Suggestions ─────────────────────────────────────────────────────────────
 
 const SUGGESTIONS = [
   "What are our critical deadlines this month?",
@@ -236,13 +13,11 @@ const SUGGESTIONS = [
   "What is Abigail working on?",
 ];
 
-// ─── Component ───────────────────────────────────────────────────────────────
-
 export default function AIAssistant() {
-  const [open, setOpen]       = useState(false);
-  const [input, setInput]     = useState("");
+  const [open, setOpen]         = useState(false);
+  const [input, setInput]       = useState("");
   const [messages, setMessages] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading]   = useState(false);
   const bottomRef = useRef(null);
   const inputRef  = useRef(null);
   const qc        = useQueryClient();
@@ -276,47 +51,28 @@ export default function AIAssistant() {
     setLoading(true);
 
     try {
-      const raw = await askGemini(buildSystemPrompt(apps, outreach, items, notes), msg);
-
-      // Split response text from action lines
-      const lines = raw.split("\n");
-      const actionLines = lines.filter((l) => {
-        const t = l.trim();
-        return t.startsWith("{") && t.includes('"action"');
+      const tools = buildTools({ supabase, apps, outreach, items, notes, log, qc });
+      const systemPrompt = buildSystemPrompt(apps, outreach, items, notes);
+      const { text: responseText, toolResults } = await askClaude({
+        userMessage: msg,
+        systemPrompt,
+        tools,
       });
-      const textLines = lines.filter((l) => {
-        const t = l.trim();
-        return !(t.startsWith("{") && t.includes('"action"'));
-      });
-      const displayText = textLines.join("\n").trim();
 
-      if (displayText) {
-        setMessages((m) => [...m, { role: "assistant", text: displayText }]);
+      if (responseText) {
+        setMessages((m) => [...m, { role: "assistant", text: responseText }]);
       }
 
-      // Execute each action and collect results
-      if (actionLines.length > 0) {
-        const results = [];
-        for (const line of actionLines) {
-          try {
-            const act = JSON.parse(line.trim());
-            const result = await executeAction(act, { apps, outreach, items, notes, log, qc });
-            if (result) results.push(result);
-          } catch {
-            // malformed JSON line — skip
-          }
-        }
-        if (results.length > 0) {
-          setMessages((m) => [
-            ...m,
-            { role: "system", text: results.map((r) => `✓ ${r}`).join("\n") },
-          ]);
-        }
+      if (toolResults.length > 0) {
+        setMessages((m) => [
+          ...m,
+          { role: "system", text: toolResults.map((r) => `✓ ${r}`).join("\n") },
+        ]);
       }
     } catch (err) {
       setMessages((m) => [
         ...m,
-        { role: "assistant", text: `Error: ${err.message ?? "Check your Gemini API key in .env.local."}` },
+        { role: "assistant", text: `Error: ${err.message ?? "Check your Anthropic API key in Vercel env vars."}` },
       ]);
     } finally {
       setLoading(false);
@@ -348,7 +104,7 @@ export default function AIAssistant() {
             </div>
             <div className="flex-1">
               <div className="text-white text-sm font-bold leading-tight">IOLA AI</div>
-              <div className="text-gray-500 text-xs">Can read, create, update, and delete anything</div>
+              <div className="text-gray-500 text-xs">Powered by Claude</div>
             </div>
             {messages.length > 0 && (
               <button
@@ -394,9 +150,7 @@ export default function AIAssistant() {
                 ) : m.role === "system" ? (
                   <div className="space-y-0.5">
                     {m.text.split("\n").map((line, j) => (
-                      <div key={j} className="text-green-400 text-xs bg-green-900/20 px-3 py-1.5 rounded-lg">
-                        {line}
-                      </div>
+                      <div key={j} className="text-green-400 text-xs bg-green-900/20 px-3 py-1.5 rounded-lg">{line}</div>
                     ))}
                   </div>
                 ) : (
