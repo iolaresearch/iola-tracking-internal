@@ -67,7 +67,7 @@ export default function AIAssistant() {
     setLoading(true);
 
     try {
-      const tools = buildTools({ supabase, apps, outreach, items, notes, log, qc });
+      const { tools, getSnapshot } = buildTools({ supabase, apps, outreach, items, notes, log, qc });
       const systemPrompt = buildSystemPrompt(apps, outreach, items, notes);
       const { text: responseText, toolResults } = await askClaude({
         userMessage: msg,

@@ -7,7 +7,16 @@ import { zodToJsonSchema } from "zod-to-json-schema";
 export function buildTools({ supabase, apps, outreach, items, notes, log, qc }) {
   const invalidate = (keys) => keys.forEach((k) => qc.invalidateQueries([k]));
 
-  return [
+  const snapshotLog = [];
+  const captureCreate = (table, id) => snapshotLog.push({ table, id, before: null });
+  const captureUpdate = async (table, id) => {
+    const tableNames = { application: "applications", outreach: "outreach", action_item: "action_items", team_note: "team_notes" };
+    const { data } = await supabase.from(tableNames[table]).select("*").eq("id", id).single();
+    snapshotLog.push({ table, id, before: data ?? null });
+  };
+  const captureDelete = captureUpdate;
+
+  const tools = [
     // ── Applications ────────────────────────────────────────────────────────
     {
       name: "create_application",
@@ -31,6 +40,7 @@ export function buildTools({ supabase, apps, outreach, items, notes, log, qc }) 
           ...args, status: args.status ?? "Not Yet Applied", priority: args.priority ?? "Medium",
           owner: args.owner ?? "Jason", deadline: args.deadline || null,
         }).select().single();
+        captureCreate("application", data.id);
         await log({ action: "AI: created application", entityType: "application", entityId: data.id, entityName: args.name });
         invalidate(["applications","activity_log"]);
         return `Created application: ${args.name}`;
@@ -55,6 +65,7 @@ export function buildTools({ supabase, apps, outreach, items, notes, log, qc }) 
         owner:            z.string().optional(),
       }),
       run: async ({ id, ...fields }) => {
+        await captureUpdate("application", id);
         await supabase.from("applications").update(fields).eq("id", id);
         const name = apps.find((a) => a.id === id)?.name ?? id;
         await log({ action: `AI: updated ${Object.keys(fields).join(", ")}`, entityType: "application", entityId: id, entityName: name });
@@ -67,6 +78,7 @@ export function buildTools({ supabase, apps, outreach, items, notes, log, qc }) 
       description: "Delete an application by UUID",
       schema: z.object({ id: z.string() }),
       run: async ({ id }) => {
+        await captureDelete("application", id);
         const name = apps.find((a) => a.id === id)?.name ?? id;
         await supabase.from("applications").delete().eq("id", id);
         await log({ action: "AI: deleted application", entityType: "application", entityId: id, entityName: name });
@@ -93,6 +105,7 @@ export function buildTools({ supabase, apps, outreach, items, notes, log, qc }) 
         const { data } = await supabase.from("outreach").insert({
           ...args, status: args.status ?? "Warm", owner: args.owner ?? "Jason", last_contact: args.last_contact || null,
         }).select().single();
+        captureCreate("outreach", data.id);
         await log({ action: "AI: created contact", entityType: "outreach", entityId: data.id, entityName: args.name });
         invalidate(["outreach","activity_log"]);
         return `Created contact: ${args.name}`;
@@ -113,6 +126,7 @@ export function buildTools({ supabase, apps, outreach, items, notes, log, qc }) 
         owner:        z.string().optional(),
       }),
       run: async ({ id, ...fields }) => {
+        await captureUpdate("outreach", id);
         await supabase.from("outreach").update(fields).eq("id", id);
         const name = outreach.find((c) => c.id === id)?.name ?? id;
         await log({ action: `AI: updated ${Object.keys(fields).join(", ")}`, entityType: "outreach", entityId: id, entityName: name });
@@ -125,6 +139,7 @@ export function buildTools({ supabase, apps, outreach, items, notes, log, qc }) 
       description: "Delete a contact by UUID",
       schema: z.object({ id: z.string() }),
       run: async ({ id }) => {
+        await captureDelete("outreach", id);
         const name = outreach.find((c) => c.id === id)?.name ?? id;
         await supabase.from("outreach").delete().eq("id", id);
         await log({ action: "AI: deleted contact", entityType: "outreach", entityId: id, entityName: name });
@@ -157,6 +172,7 @@ export function buildTools({ supabase, apps, outreach, items, notes, log, qc }) 
           due_date: args.due_date || null,
           sort_order: maxOrder + 1,
         }).select().single();
+        captureCreate("action_item", data.id);
         await log({ action: "AI: created task", entityType: "action_item", entityId: data.id, entityName: args.title });
         invalidate(["action_items","activity_log"]);
         return `Created task: ${args.title}`;
@@ -177,6 +193,7 @@ export function buildTools({ supabase, apps, outreach, items, notes, log, qc }) 
         sort_order:  z.number().optional(),
       }),
       run: async ({ id, ...fields }) => {
+        await captureUpdate("action_item", id);
         await supabase.from("action_items").update(fields).eq("id", id);
         // Look up title: from local cache, from fields if being renamed, or from DB
         let name = fields.title ?? items.find((i) => i.id === id)?.title;
@@ -194,6 +211,7 @@ export function buildTools({ supabase, apps, outreach, items, notes, log, qc }) 
       description: "Delete a task by UUID",
       schema: z.object({ id: z.string() }),
       run: async ({ id }) => {
+        await captureDelete("action_item", id);
         const name = items.find((i) => i.id === id)?.title ?? id;
         await supabase.from("action_items").delete().eq("id", id);
         await log({ action: "AI: deleted task", entityType: "action_item", entityId: id, entityName: name });
@@ -215,6 +233,7 @@ export function buildTools({ supabase, apps, outreach, items, notes, log, qc }) 
         const { data: { session } } = await supabase.auth.getSession();
         const created_by = session?.user?.email?.split("@")[0] ?? "AI";
         const { data } = await supabase.from("team_notes").insert({ ...args, created_by }).select().single();
+        captureCreate("team_note", data.id);
         await log({ action: "AI: saved to knowledge base", entityType: "team_note", entityId: data.id, entityName: args.title });
         invalidate(["team_notes","activity_log"]);
         return `Saved to knowledge base: ${args.title}`;
@@ -230,6 +249,7 @@ export function buildTools({ supabase, apps, outreach, items, notes, log, qc }) 
         category: z.enum(["Contact","Context","Rule","Fundraising","Engineering","Research","General"]).optional(),
       }),
       run: async ({ id, ...fields }) => {
+        await captureUpdate("team_note", id);
         await supabase.from("team_notes").update(fields).eq("id", id);
         const name = notes.find((n) => n.id === id)?.title ?? id;
         await log({ action: "AI: updated knowledge note", entityType: "team_note", entityId: id, entityName: name });
@@ -242,6 +262,7 @@ export function buildTools({ supabase, apps, outreach, items, notes, log, qc }) 
       description: "Delete a knowledge base note by UUID",
       schema: z.object({ id: z.string() }),
       run: async ({ id }) => {
+        await captureDelete("team_note", id);
         const name = notes.find((n) => n.id === id)?.title ?? id;
         await supabase.from("team_notes").delete().eq("id", id);
         await log({ action: "AI: deleted knowledge note", entityType: "team_note", entityId: id, entityName: name });
@@ -250,6 +271,8 @@ export function buildTools({ supabase, apps, outreach, items, notes, log, qc }) 
       },
     },
   ];
+
+  return { tools, getSnapshot: () => [...snapshotLog] };
 }
 
 // ─── System prompt ────────────────────────────────────────────────────────────
@@ -362,7 +385,8 @@ export async function askClaude({ userMessage, systemPrompt, tools, supabase, co
           system: systemPrompt,
           tools: anthropicTools,
           messages,
-          max_tokens: 2048,
+          max_tokens: 4096,
+          thinking: { type: "enabled", budget_tokens: 1024 },
         }),
       }
     );
