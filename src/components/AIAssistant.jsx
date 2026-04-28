@@ -30,9 +30,10 @@ function getResultLink(text) {
 export default function AIAssistant() {
   const navigate = useNavigate();
   const [open, setOpen]         = useState(false);
-  const [input, setInput]       = useState("");
-  const [messages, setMessages] = useState([]);
-  const [loading, setLoading]   = useState(false);
+  const [input, setInput]         = useState("");
+  const [messages, setMessages]   = useState([]);   // UI display messages
+  const [history, setHistory]     = useState([]);   // Claude conversation history (user+assistant turns only)
+  const [loading, setLoading]     = useState(false);
   const bottomRef = useRef(null);
   const inputRef  = useRef(null);
   const qc        = useQueryClient();
@@ -73,6 +74,17 @@ export default function AIAssistant() {
         systemPrompt,
         tools,
         supabase,
+        conversationHistory: history,
+      });
+
+      // Update Claude conversation history (keep last 20 turns to avoid context overflow)
+      setHistory((h) => {
+        const next = [
+          ...h,
+          { role: "user", content: msg },
+          ...(responseText ? [{ role: "assistant", content: responseText }] : []),
+        ];
+        return next.slice(-20);
       });
 
       if (responseText) {
@@ -148,7 +160,7 @@ export default function AIAssistant() {
               <div style={{ fontSize: 10, color: "var(--tff)", marginTop: 2 }}>Powered by Claude</div>
             </div>
             {messages.length > 0 && (
-              <button onClick={() => setMessages([])} style={{ background: "none", border: "none", color: "var(--tff)", cursor: "pointer", fontSize: 11, fontFamily: "var(--font)" }}>Clear</button>
+              <button onClick={() => { setMessages([]); setHistory([]); }} style={{ background: "none", border: "none", color: "var(--tff)", cursor: "pointer", fontSize: 11, fontFamily: "var(--font)" }}>Clear</button>
             )}
           </div>
 

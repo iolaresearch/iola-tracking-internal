@@ -298,7 +298,7 @@ function cleanSchema(schema) {
   };
 }
 
-export async function askClaude({ userMessage, systemPrompt, tools, supabase }) {
+export async function askClaude({ userMessage, systemPrompt, tools, supabase, conversationHistory = [] }) {
   // Convert tool registry to Anthropic/Bedrock tool format
   const anthropicTools = tools.map((t) => ({
     name: t.name,
@@ -332,8 +332,8 @@ export async function askClaude({ userMessage, systemPrompt, tools, supabase }) 
     return res.json();
   };
 
-  // Agentic loop — handles tool_use → tool_result turns
-  const messages = [{ role: "user", content: userMessage }];
+  // Agentic loop — full conversation history + current message
+  const messages = [...conversationHistory, { role: "user", content: userMessage }];
   const toolResults = [];
   let text = "";
 
