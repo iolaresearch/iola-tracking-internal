@@ -79,7 +79,16 @@ export default function Applications() {
 
   const { data: apps = [], isLoading } = useQuery({
     queryKey: ["applications"],
-    queryFn: () => supabase.from("applications").select("*").order("created_at").then(r => r.data ?? []),
+    queryFn: () => supabase.from("applications").select("*")
+      .order("priority", { ascending: true }) // will be overridden client-side
+      .order("created_at", { ascending: false })
+      .then(r => {
+        const PRIORITY_ORDER = { Critical: 0, High: 1, Medium: 2, Low: 3 };
+        return (r.data ?? []).sort((a, b) =>
+          (PRIORITY_ORDER[a.priority] ?? 9) - (PRIORITY_ORDER[b.priority] ?? 9) ||
+          new Date(b.created_at) - new Date(a.created_at)
+        );
+      }),
   });
 
   const upsert = useMutation({

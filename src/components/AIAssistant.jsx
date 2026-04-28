@@ -27,17 +27,53 @@ function getResultLink(text) {
   return null;
 }
 
+const STORAGE_KEY = (email) => `iola_chat_${email}`;
+
 export default function AIAssistant({ createAlert }) {
   const navigate = useNavigate();
   const [open, setOpen]         = useState(false);
   const [input, setInput]         = useState("");
-  const [messages, setMessages]   = useState([]);   // UI display messages
-  const [history, setHistory]     = useState([]);   // Claude conversation history (user+assistant turns only)
+  const [messages, setMessages]   = useState([]);
+  const [history, setHistory]     = useState([]);
   const [loading, setLoading]     = useState(false);
+  const [undoing, setUndoing]     = useState(false);
+  const [userEmail, setUserEmail] = useState(null);
   const bottomRef = useRef(null);
   const inputRef  = useRef(null);
   const qc        = useQueryClient();
   const { log }   = useActivity();
+
+  // Load user email + restore persisted history
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      const email = session?.user?.email ?? null;
+      setUserEmail(email);
+      if (email) {
+        try {
+          const saved = localStorage.getItem(STORAGE_KEY(email));
+          if (saved) {
+            const { messages: m, history: h } = JSON.parse(saved);
+            if (m?.length) setMessages(m);
+            if (h?.length) setHistory(h);
+          }
+        } catch { /* ignore corrupt storage */ }
+      }
+    });
+  }, []);
+
+  // Persist chat to localStorage whenever it changes
+  useEffect(() => {
+    if (!userEmail || (!messages.length && !history.length)) return;
+    try {
+      localStorage.setItem(STORAGE_KEY(userEmail), JSON.stringify({ messages, history }));
+    } catch { /* ignore quota errors */ }
+  }, [messages, history, userEmail]);
+
+  const clearChat = () => {
+    setMessages([]);
+    setHistory([]);
+    if (userEmail) localStorage.removeItem(STORAGE_KEY(userEmail));
+  };
 
   const { data: apps = [] } = useQuery({
     queryKey: ["applications"],
@@ -172,9 +208,19 @@ export default function AIAssistant({ createAlert }) {
               <div style={{ fontSize: 13, fontWeight: 700, color: "var(--t)", lineHeight: 1 }}>IOLA AI</div>
               <div style={{ fontSize: 10, color: "var(--tff)", marginTop: 2 }}>Powered by Claude</div>
             </div>
-            {messages.length > 0 && (
-              <button onClick={() => { setMessages([]); setHistory([]); }} style={{ background: "none", border: "none", color: "var(--tff)", cursor: "pointer", fontSize: 11, fontFamily: "var(--font)" }}>Clear</button>
-            )}
+            <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+              <button
+                title="Undo last AI action"
+                disabled={undoing}
+                onClick={() => send("undo the last thing you did")}
+                style={{ background: "none", border: "1px solid var(--b)", borderRadius: 5, color: "var(--tm)", cursor: "pointer", fontSize: 11, padding: "2px 7px", fontFamily: "var(--font)", transition: "all 0.12s" }}
+                onMouseEnter={e => { e.currentTarget.style.color = "#C084FC"; e.currentTarget.style.borderColor = "rgba(192,132,252,0.4)"; }}
+                onMouseLeave={e => { e.currentTarget.style.color = "var(--tm)"; e.currentTarget.style.borderColor = "var(--b)"; }}
+              >↩</button>
+              {messages.length > 0 && (
+                <button onClick={clearChat} style={{ background: "none", border: "none", color: "var(--tff)", cursor: "pointer", fontSize: 11, fontFamily: "var(--font)" }}>Clear</button>
+              )}
+            </div>
           </div>
 
           {/* Messages */}

@@ -171,7 +171,25 @@ export function buildTools({ supabase, apps, outreach, items, notes, log, qc }) 
       run: async (args) => {
         const owners = args.owners?.length ? args.owners : (args.owner ? [args.owner] : ["Jason"]);
         const owner = owners[0];
-        const groupItems = items.filter((i) => i.week_label === args.week_label);
+
+        // Auto-derive week_label from due_date if not provided
+        let week_label = args.week_label;
+        if (!week_label && args.due_date) {
+          const existing = [...new Set(items.map(i => i.week_label).filter(Boolean))];
+          // Try to find a matching group by checking if the due date falls within date ranges
+          const matched = existing.find(g => {
+            const parts = g.match(/(\w{3}\s+\d+)/g);
+            if (!parts || parts.length < 2) return false;
+            const due = new Date(args.due_date);
+            const year = due.getFullYear();
+            const tryParse = (s) => new Date(`${s} ${year}`);
+            const [start, end] = [tryParse(parts[0]), tryParse(parts[parts.length - 1])];
+            return due >= start && due <= end;
+          });
+          week_label = matched || existing[0] || "";
+        }
+
+        const groupItems = items.filter((i) => i.week_label === week_label);
         const maxOrder = groupItems.reduce((m, i) => Math.max(m, i.sort_order ?? 0), -1);
         const { data, error } = await supabase.from("action_items").insert({
           title: args.title,
@@ -181,7 +199,7 @@ export function buildTools({ supabase, apps, outreach, items, notes, log, qc }) 
           due_date: args.due_date || null,
           status: args.status ?? "To Do",
           priority: args.priority ?? "High",
-          week_label: args.week_label,
+          week_label,
           sort_order: maxOrder + 1,
         }).select().single();
         if (error || !data) throw new Error(error?.message ?? "Insert failed: no data returned");
@@ -284,6 +302,54 @@ export function buildTools({ supabase, apps, outreach, items, notes, log, qc }) 
         return `Deleted: ${name}`;
       },
     },
+    // ── Undo ──────────────────────────────────────────────────────────────────
+    {
+      name: "undo_last_action",
+      description: "Undo the last AI action this user performed. Use when user says 'undo', 'undo that', 'undo what you just did', 'revert', 'that was wrong'. Fetches the most recent ai_action alert and restores all changed records to their previous state.",
+      schema: z.object({}),
+      run: async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        const email = session?.user?.email;
+        if (!email) throw new Error("Not authenticated");
+
+        // Get most recent undismissed ai_action alert for this user
+        const { data: alerts, error } = await supabase
+          .from("alerts")
+          .select("*")
+          .eq("user_email", email)
+          .eq("type", "ai_action")
+          .eq("dismissed", false)
+          .order("created_at", { ascending: false })
+          .limit(1);
+
+        if (error) throw new Error(error.message);
+        if (!alerts?.length) return "No recent AI actions found to undo.";
+
+        const alert = alerts[0];
+        if (!alert.snapshot?.length) return "The last action has no snapshot — cannot undo.";
+
+        const TABLE_MAP = { application: "applications", outreach: "outreach", action_item: "action_items", team_note: "team_notes" };
+        const results = [];
+        for (const entry of alert.snapshot) {
+          const tableName = TABLE_MAP[entry.table] ?? entry.table;
+          if (entry.before === null) {
+            const { error: e } = await supabase.from(tableName).delete().eq("id", entry.id);
+            if (e) throw new Error(`Undo failed on ${tableName}: ${e.message}`);
+            results.push(`Removed ${entry.table}`);
+          } else {
+            const { error: e } = await supabase.from(tableName).upsert(entry.before);
+            if (e) throw new Error(`Undo failed on ${tableName}: ${e.message}`);
+            results.push(`Restored ${entry.before.name ?? entry.before.title ?? entry.table}`);
+          }
+        }
+
+        // Dismiss the alert
+        await supabase.from("alerts").update({ dismissed: true }).eq("id", alert.id);
+
+        invalidate(["applications","outreach","action_items","team_notes","alerts","activity_log"]);
+        return `Undone: ${results.join(", ")}`;
+      },
+    },
   ];
 
   return { tools, getSnapshot: () => [...snapshotLog] };
@@ -318,7 +384,7 @@ Active applications: ${apps.filter(a => ["Applied","In Progress"].includes(a.sta
 1. INFER INTENT. "add application to YC" means Y Combinator — a top-tier US accelerator, typically $500K, highly competitive. You know what it is. Don't ask what it is.
 2. INFER PRIORITY INTELLIGENTLY. If the user doesn't specify priority, assess it based on: deadline urgency, strategic importance, what else is already Critical. If there are already 5 Critical tasks, consider making a new one High unless it's genuinely more urgent than existing ones. Tell the user your reasoning.
 3. INFER DEADLINES. "add YC with deadline may 4" — you know today is ${todayStr}, so that's ${daysUntil("2026-05-04") ?? "N/A"} days away. Surface that context.
-4. INFER GROUPING. Pick the right week group based on the due date. If due May 4, it belongs in "Week 1 — Apr 28 to May 4".
+4. INFER GROUPING. ALWAYS set week_label. Pick from existing groups based on the due date. If due May 4, it belongs in "Week 1 — Apr 28 to May 4". If due May 9, it belongs in "Week 2 — May 5 to May 11". NEVER leave week_label empty.
 5. INFER OWNER. If not stated, default to Jason. If the task involves engineering or research, suggest Salami or Abigail.
 6. INFER TYPE. "YC", "Techstars", "a16z", "Black Flag" = Accelerator. "EU Horizon", "ESA", "GSMA" = Grant. "Sequoia", "a16z" = VC / Angel. Use your world knowledge.
 7. NEVER ASK FOR INFORMATION YOU CAN REASONABLY INFER. Only ask if genuinely ambiguous.
@@ -361,7 +427,8 @@ action_items: title, description, owner, owners (text array), due_date, status, 
 team_notes: title, body, category, created_by
 ════════════════════════════════════════════════
 
-When the user says "remember", "note that", "save this" — use create_team_note.`;
+When the user says "remember", "note that", "save this" — use create_team_note.
+When the user says "undo", "undo that", "revert", "that was wrong" — use undo_last_action immediately without asking for confirmation.`;
 }
 
 // ─── Main ask function ────────────────────────────────────────────────────────
