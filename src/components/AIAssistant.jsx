@@ -57,6 +57,7 @@ export default function AIAssistant() {
         userMessage: msg,
         systemPrompt,
         tools,
+        supabase,
       });
 
       if (responseText) {

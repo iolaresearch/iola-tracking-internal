@@ -1,4 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
+// Claude via Bedrock — calls Supabase edge function proxy (AWS creds stay server-side)
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 
@@ -275,30 +275,43 @@ When the user says "remember", "note that", "save this" — use create_team_note
 
 // ─── Main ask function ────────────────────────────────────────────────────────
 
-export async function askClaude({ userMessage, systemPrompt, tools }) {
-  const client = new Anthropic({
-    apiKey: import.meta.env.VITE_ANTHROPIC_API_KEY,
-    dangerouslyAllowBrowser: true,
-  });
-
-  // Convert our tool registry to Anthropic SDK tool format
+export async function askClaude({ userMessage, systemPrompt, tools, supabase }) {
+  // Convert tool registry to Anthropic tool format
   const anthropicTools = tools.map((t) => ({
     name: t.name,
     description: t.description,
     input_schema: zodToJsonSchema(t.schema, { $refStrategy: "none" }),
   }));
 
-  const response = await client.messages.create({
-    model: "claude-opus-4-7",
-    max_tokens: 2048,
-    system: systemPrompt,
-    tools: anthropicTools,
-    messages: [{ role: "user", content: userMessage }],
-  });
+  // Call via Supabase edge function — AWS creds live server-side, never in browser
+  const { data: { session } } = await supabase.auth.getSession();
+  const res = await fetch(
+    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/claude-proxy`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${session?.access_token}`,
+      },
+      body: JSON.stringify({
+        system: systemPrompt,
+        tools: anthropicTools,
+        messages: [{ role: "user", content: userMessage }],
+        max_tokens: 2048,
+      }),
+    }
+  );
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error?.message ?? `Proxy error ${res.status}`);
+  }
+
+  const response = await res.json();
 
   // Execute any tool calls
   const toolResults = [];
-  for (const block of response.content) {
+  for (const block of response.content ?? []) {
     if (block.type === "tool_use") {
       const toolDef = tools.find((t) => t.name === block.name);
       if (toolDef) {
@@ -309,7 +322,7 @@ export async function askClaude({ userMessage, systemPrompt, tools }) {
   }
 
   // Extract text
-  const text = response.content
+  const text = (response.content ?? [])
     .filter((b) => b.type === "text")
     .map((b) => b.text)
     .join("\n")
