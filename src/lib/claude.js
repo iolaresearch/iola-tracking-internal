@@ -36,10 +36,11 @@ export function buildTools({ supabase, apps, outreach, items, notes, log, qc }) 
         owner:            z.string().optional(),
       }),
       run: async (args) => {
-        const { data } = await supabase.from("applications").insert({
+        const { data, error } = await supabase.from("applications").insert({
           ...args, status: args.status ?? "Not Yet Applied", priority: args.priority ?? "Medium",
           owner: args.owner ?? "Jason", deadline: args.deadline || null,
         }).select().single();
+        if (error || !data) throw new Error(error?.message ?? "Insert failed: no data returned");
         captureCreate("application", data.id);
         await log({ action: "AI: created application", entityType: "application", entityId: data.id, entityName: args.name });
         invalidate(["applications","activity_log"]);
@@ -102,9 +103,10 @@ export function buildTools({ supabase, apps, outreach, items, notes, log, qc }) 
         owner:        z.string().optional(),
       }),
       run: async (args) => {
-        const { data } = await supabase.from("outreach").insert({
+        const { data, error } = await supabase.from("outreach").insert({
           ...args, status: args.status ?? "Warm", owner: args.owner ?? "Jason", last_contact: args.last_contact || null,
         }).select().single();
+        if (error || !data) throw new Error(error?.message ?? "Insert failed: no data returned");
         captureCreate("outreach", data.id);
         await log({ action: "AI: created contact", entityType: "outreach", entityId: data.id, entityName: args.name });
         invalidate(["outreach","activity_log"]);
@@ -151,27 +153,34 @@ export function buildTools({ supabase, apps, outreach, items, notes, log, qc }) 
     // ── Action Items ──────────────────────────────────────────────────────────
     {
       name: "create_action_item",
-      description: "Add a new task or action item",
+      description: "Add a new task or action item. Use owners[] for multiple assignees.",
       schema: z.object({
         title:       z.string(),
         description: z.string().optional(),
-        owner:       z.string().optional(),
+        owner:       z.string().optional().describe("Primary owner (first of owners list)"),
+        owners:      z.array(z.string()).optional().describe("List of assignees e.g. ['Jason','Abigail','Salami']"),
         due_date:    z.string().optional().describe("YYYY-MM-DD"),
         status:      z.enum(["To Do","In Progress","Done"]).optional(),
         priority:    z.enum(["Critical","High","Medium","Low"]).optional(),
         week_label:  z.string().optional().describe("Group name"),
       }),
       run: async (args) => {
+        const owners = args.owners?.length ? args.owners : (args.owner ? [args.owner] : ["Jason"]);
+        const owner = owners[0];
         const groupItems = items.filter((i) => i.week_label === args.week_label);
         const maxOrder = groupItems.reduce((m, i) => Math.max(m, i.sort_order ?? 0), -1);
-        const { data } = await supabase.from("action_items").insert({
-          ...args,
+        const { data, error } = await supabase.from("action_items").insert({
+          title: args.title,
+          description: args.description,
+          owner,
+          owners,
+          due_date: args.due_date || null,
           status: args.status ?? "To Do",
           priority: args.priority ?? "High",
-          owner: args.owner ?? "Jason",
-          due_date: args.due_date || null,
+          week_label: args.week_label,
           sort_order: maxOrder + 1,
         }).select().single();
+        if (error || !data) throw new Error(error?.message ?? "Insert failed: no data returned");
         captureCreate("action_item", data.id);
         await log({ action: "AI: created task", entityType: "action_item", entityId: data.id, entityName: args.title });
         invalidate(["action_items","activity_log"]);
@@ -232,7 +241,8 @@ export function buildTools({ supabase, apps, outreach, items, notes, log, qc }) 
       run: async (args) => {
         const { data: { session } } = await supabase.auth.getSession();
         const created_by = session?.user?.email?.split("@")[0] ?? "AI";
-        const { data } = await supabase.from("team_notes").insert({ ...args, created_by }).select().single();
+        const { data, error } = await supabase.from("team_notes").insert({ ...args, created_by }).select().single();
+        if (error || !data) throw new Error(error?.message ?? "Insert failed: no data returned");
         captureCreate("team_note", data.id);
         await log({ action: "AI: saved to knowledge base", entityType: "team_note", entityId: data.id, entityName: args.title });
         invalidate(["team_notes","activity_log"]);
