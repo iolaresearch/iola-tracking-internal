@@ -78,7 +78,7 @@ export default function Layout() {
               background: "var(--a-dim)", border: "1px solid var(--a-border)",
               display: "flex", alignItems: "center", justifyContent: "center",
             }}>
-              <span style={{ fontSize: 9, fontWeight: 800, color: "var(--accent)", letterSpacing: "-0.03em", lineHeight: 1 }}>IOL</span>
+              <img src="/iola-logo.png" alt="IOLA" style={{ width: 20, height: 20, objectFit: "contain" }} />
             </div>
             <div>
               <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: "-0.03em", color: "var(--t)", lineHeight: 1 }}>IOLA</div>
